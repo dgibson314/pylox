@@ -1,9 +1,10 @@
 import sys
 
+from scanner import Scanner
 
 class Lox():
     def __init__(self):
-        self.had_error = False
+        had_error = False
 
     def run_file(self, path):
         with open(path, "r") as f:
@@ -14,14 +15,17 @@ class Lox():
 
     def run_prompt(self):
         while True:
-            line = input("> ")
-            if not line:
+            try:
+                line = input("> ")
+                if not line:
+                    break
+                self.run(line)
+                self.had_error = False
+            except EOFError:
                 break
-            self.run(line)
-            self.had_error = False
 
     def run(self, program):
-        scanner = Scanner(program)
+        scanner = Scanner(self, program)
         tokens = scanner.scan_tokens()
 
         for token in tokens:
