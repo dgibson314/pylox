@@ -11,68 +11,68 @@ class Scanner():
     def __init__(self, interpreter, source):
         self.interpreter = interpreter
         self.source = source
+        self.tokens = []
         self.start = 0
         self.current = 0
         self.line = 1
 
     def scan_tokens(self):
-        tokens = []
         while not self.at_end():
             self.start = self.current
-            self.scan_token(tokens)
+            self.scan_token()
 
-        tokens.append(Token(TT.EOF, "", None, self.line))
-        return tokens
+        self.tokens.append(Token(TT.EOF, "", None, self.line))
+        return self.tokens
 
-    def scan_token(self, tokens):
+    def scan_token(self):
         c = self.advance()
         match c:
             case "(":
-                tokens.append(self.tokenize(TT.LEFT_PAREN))
+                self.add_token(TT.LEFT_PAREN)
             case ")":
-                tokens.append(self.tokenize(TT.RIGHT_PAREN))
+                self.add_token(TT.RIGHT_PAREN)
             case "{":
-                tokens.append(self.tokenize(TT.LEFT_BRACE))
+                self.add_token(TT.LEFT_BRACE)
             case "}":
-                tokens.append(self.tokenize(TT.RIGHT_BRACE))
+                self.add_token(TT.RIGHT_BRACE)
             case ",":
-                tokens.append(self.tokenize(TT.COMMA))
+                self.add_token(TT.COMMA)
             case ".":
-                tokens.append(self.tokenize(TT.DOT))
+                self.add_token(TT.DOT)
             case "-":
-                tokens.append(self.tokenize(TT.MINUS))
+                self.add_token(TT.MINUS)
             case "+":
-                tokens.append(self.tokenize(TT.PLUS))
+                self.add_token(TT.PLUS)
             case ";":
-                tokens.append(self.tokenize(TT.SEMICOLON))
+                self.add_token(TT.SEMICOLON)
             case "*":
-                tokens.append(self.tokenize(TT.STAR))
+                self.add_token(TT.STAR)
             case "!":
-                tokens.append(self.tokenize(TT.BANG_EQUAL if self._match("=") else TT.BANG))
+                self.add_token(TT.BANG_EQUAL if self._match("=") else TT.BANG)
             case "=":
-                tokens.append(self.tokenize(TT.EQUAL_EQUAL if self._match("=") else TT.EQUAL))
+                self.add_token(TT.EQUAL_EQUAL if self._match("=") else TT.EQUAL)
             case "<":
-                tokens.append(self.tokenize(TT.LESS_EQUAL if self._match("=") else TT.LESS))
+                self.add_token(TT.LESS_EQUAL if self._match("=") else TT.LESS)
             case ">":
-                tokens.append(self.tokenize(TT.GREATER_EQUAL if self._match("=") else TT.GREATER))
+                self.add_token(TT.GREATER_EQUAL if self._match("=") else TT.GREATER)
             case "/":
                 if self._match("/"):
                     while (self.peek() != "\n" and not self.at_end()):
                         self.advance()
                 else:
-                    tokens.append(tokenize(TT.SLASH))
+                    self.add_token(TT.SLASH)
             case " " | "\r" | "\t":
                 pass
             case "\n":
                 self.line += 1
             case '"':
-                tokens.append(self.handle_string())
+                self.handle_string()
 
             case _ :
                 if c.isnumeric():
-                    tokens.append(self.handle_number())
+                    self.handle_number()
                 elif c.isalpha():
-                    tokens.append(self.handle_identifier())
+                    self.handle_identifier()
                 else:
                     self.interpreter.error(self.line, "Unexpected character.")
 
@@ -92,7 +92,7 @@ class Scanner():
 
         # Trim the surrounding quotes
         string = self.source[self.start+1 : self.current-1]
-        return self.tokenize(TT.STRING, literal=string)
+        return self.add_token(TT.STRING, literal=string)
 
     def handle_number(self):
         # Consume first half of number (before decimal point)
@@ -108,7 +108,7 @@ class Scanner():
                 self.advance()
         
         number = float(self.source[self.start:self.current])
-        return self.tokenize(TT.NUMBER, literal=number)
+        return self.add_token(TT.NUMBER, literal=number)
 
     def handle_identifier(self):
         while (self.peek()).isalnum():
@@ -118,7 +118,7 @@ class Scanner():
         token_type = Scanner.keywords.get(text)
         if token_type is None:
             token_type = TT.IDENTIFIER
-        return self.tokenize(token_type)
+        return self.add_token(token_type)
 
     def advance(self):
         # Consumes the current character in the source file and returns it
@@ -143,9 +143,9 @@ class Scanner():
             return True
         return False
 
-    def tokenize(self, token_type, literal=None):
+    def add_token(self, token_type, literal=None):
         text = self.source[self.start:self.current]
-        return Token(token_type, text, literal, self.line)
+        self.tokens.append(Token(token_type, text, literal, self.line))
 
     def at_end(self):
         return (self.current >= len(self.source))
