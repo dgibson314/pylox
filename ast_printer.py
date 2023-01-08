@@ -30,6 +30,28 @@ class AstPrinter(ExprVisitor):
         return result
 
 
+def pretty_printer(expr):
+    match expr:
+        case Binary():
+            return parenthesize(expr.operator.lexeme, expr.left, expr.right)
+        case Grouping():
+            return parenthesize("group", expr.expression)
+        case Literal():
+            return "nil" if expr.value is None else str(expr.value)
+        case Unary():
+            return parenthesize(expr.operator.lexeme, expr.right)
+    
+def parenthesize(name, *exprs):
+    result = f"({name}"
+
+    for expr in exprs:
+        result += " "
+        result += pretty_printer(expr)
+
+    result += ")"
+    return result
+
+
 if __name__ == "__main__":
     expression = \
         Binary(
@@ -44,3 +66,4 @@ if __name__ == "__main__":
         )
 
     print(AstPrinter().print(expression))
+    print(pretty_printer(expression))
