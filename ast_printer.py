@@ -5,7 +5,7 @@ from token_type import TokenType as TT
 
 class AstPrinter(ExprVisitor):
     def print(self, expr):
-        return expr.accept(self)
+        print(expr.accept(self))
 
     def visit_binary(self, bin_expr):
         return self.parenthesize(bin_expr.operator.lexeme, bin_expr.left, bin_expr.right)
@@ -65,5 +65,5 @@ if __name__ == "__main__":
             )
         )
 
-    print(AstPrinter().print(expression))
+    AstPrinter().print(expression)
     print(pretty_printer(expression))

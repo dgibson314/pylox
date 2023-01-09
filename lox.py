@@ -1,10 +1,14 @@
 import sys
 
+from ast_printer import AstPrinter
+from parser import Parser
 from scanner import Scanner
+from token import Token
+from token_type import TokenType
 
 class Lox():
     def __init__(self):
-        had_error = False
+        self.had_error = False
 
     def run_file(self, path):
         with open(path, "r") as f:
@@ -28,11 +32,21 @@ class Lox():
         scanner = Scanner(self, program)
         tokens = scanner.scan_tokens()
 
-        for token in tokens:
-            print(token)
+        parser = Parser(self, tokens)
+        expression = parser.parse()
+
+        if self.had_error: return
+
+        AstPrinter().print(expression)
 
     def error(self, line, message):
         self.report(line, "", message)
+
+    def parse_error(self, token, message):
+        if token.type is TokenType.EOF:
+            self.report(token.line, " at end", message)
+        else:
+            self.report(token.line, " at '" + token.lexeme + "'", message)
 
     def report(self, line, where, message):
         print(f"[line {line}] Error{where}: {message}")
