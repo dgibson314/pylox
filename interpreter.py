@@ -81,9 +81,7 @@ class Interpreter(ExprVisitor):
                 return left * right
             case TT.PLUS:
                 match left, right:
-                    case float(), float():
-                        return left + right
-                    case str(), str():
+                    case (float(), float()) | (str(), str()):
                         return left + right
                     case _:
                         print(f"Type of left: {type(left)}")
