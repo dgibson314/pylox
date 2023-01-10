@@ -1,6 +1,7 @@
 import sys
 
 from ast_printer import AstPrinter
+from interpreter import Interpreter
 from parser import Parser
 from scanner import Scanner
 from token import Token
@@ -9,6 +10,8 @@ from token_type import TokenType
 class Lox():
     def __init__(self):
         self.had_error = False
+        self.had_runtime_error = False
+        self.interpreter = Interpreter(self)
 
     def run_file(self, path):
         with open(path, "r") as f:
@@ -16,6 +19,8 @@ class Lox():
 
             if self.had_error:
                 sys.exit(65)
+            if self.had_runtime_error:
+                sys.exit(70)
 
     def run_prompt(self):
         while True:
@@ -36,11 +41,15 @@ class Lox():
         expression = parser.parse()
 
         if self.had_error: return
-
-        AstPrinter().print(expression)
+        
+        self.interpreter.interpret(expression)
 
     def error(self, line, message):
         self.report(line, "", message)
+
+    def runtime_error(self, error):
+        print(f"{error.message}\n[line {error.token.line}]")
+        self.had_runtime_error = True
 
     def parse_error(self, token, message):
         if token.type is TokenType.EOF:

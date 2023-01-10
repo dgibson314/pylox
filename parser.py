@@ -22,8 +22,8 @@ class Parser():
     primary        → NUMBER | STRING | "true" | "false" | "nil"
                    | "(" expression ")" ;
     """
-    def __init__(self, interpreter, tokens):
-        self.interpreter = interpreter
+    def __init__(self, runtime, tokens):
+        self.runtime = runtime
         self.tokens = tokens
         self.current = 0
 
@@ -127,7 +127,7 @@ class Parser():
         self.error(self.peek(), message)
 
     def error(self, token, message):
-        self.interpreter.parse_error(token, message)
+        self.runtime.parse_error(token, message)
         raise ParserException
 
     def synchronize(self):

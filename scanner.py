@@ -8,8 +8,8 @@ class Scanner():
         "print": TT.PRINT, "return": TT.RETURN, "super": TT.SUPER, "this": TT.THIS,
         "true": TT.TRUE, "var": TT.VAR, "while": TT.WHILE
     }
-    def __init__(self, interpreter, source):
-        self.interpreter = interpreter
+    def __init__(self, runtime, source):
+        self.runtime = runtime
         self.source = source
         self.tokens = []
         self.start = 0
@@ -74,7 +74,7 @@ class Scanner():
                 elif c.isalpha():
                     self.handle_identifier()
                 else:
-                    self.interpreter.error(self.line, "Unexpected character.")
+                    self.runtime.error(self.line, "Unexpected character.")
 
     def handle_string(self):
         # Consume body of string
@@ -84,7 +84,7 @@ class Scanner():
             self.advance()
 
         if self.at_end():
-            self.interpreter.error(self.line, "Unterminated string.")
+            self.runtime.error(self.line, "Unterminated string.")
             return
 
         # The closing ".
