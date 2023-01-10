@@ -45,6 +45,10 @@ class Interpreter(ExprVisitor):
             case float(), float(): return
             case _: raise RuntimeException(operator, "Operands must be numbers.")
 
+    def check_zero_divisor(self, operator, right):
+        if right == 0.0:
+            raise RuntimeException(operator, "Cannot divide by zero.")
+
     def visit_binary(self, expr):
         left = self.evaluate(expr.left)
         right = self.evaluate(expr.right)
@@ -70,6 +74,7 @@ class Interpreter(ExprVisitor):
                 return left - right
             case TT.SLASH:
                 self.check_number_operands(expr.operator, left, right)
+                self.check_zero_divisor(expr.operator, right)
                 return left / right
             case TT.STAR:
                 self.check_number_operands(expr.operator, left, right)
