@@ -15,7 +15,9 @@ class Lox():
 
     def run_file(self, path):
         with open(path, "r") as f:
-            self.run(f.readlines())
+            lines = f.readlines()
+            program = ''.join(lines)
+            self.run(program)
 
             if self.had_error:
                 sys.exit(65)
@@ -38,11 +40,12 @@ class Lox():
         tokens = scanner.scan_tokens()
 
         parser = Parser(self, tokens)
-        expression = parser.parse()
+        statements = parser.parse()
 
+        # Stop if there was a syntax error
         if self.had_error: return
         
-        self.interpreter.interpret(expression)
+        self.interpreter.interpret(statements)
 
     def error(self, line, message):
         self.report(line, "", message)

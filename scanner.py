@@ -74,7 +74,7 @@ class Scanner():
                 elif c.isalpha():
                     self.handle_identifier()
                 else:
-                    self.runtime.error(self.line, "Unexpected character.")
+                    self.runtime.error(self.line, f"Unexpected character: {c}.")
 
     def handle_string(self):
         # Consume body of string

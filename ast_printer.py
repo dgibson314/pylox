@@ -1,4 +1,4 @@
-from expr import *
+from ast.expr import *
 from token import Token
 from token_type import TokenType as TT
 

@@ -1,22 +1,20 @@
-from expr import *
+from ast.expr import ExprVisitor
+from ast.stmt import StmtVisitor
+from environment import Environment
+from exceptions import RuntimeException
 from token import Token
 from token_type import TokenType as TT
 
 
-class RuntimeException(Exception):
-    def __init__(self, token, message):
-        self.token = token
-        self.message = message
-
-
-class Interpreter(ExprVisitor):
+class Interpreter(ExprVisitor, StmtVisitor):
     def __init__(self, runtime):
         self.runtime = runtime
+        self.environment = Environment()
 
-    def interpret(self, expr):
+    def interpret(self, statements):
         try:
-            value = self.evaluate(expr)
-            print(self.stringify(value))
+            for statement in statements:
+                self.execute(statement)
         except RuntimeException as error:
             self.runtime.runtime_error(error)
 
@@ -91,6 +89,50 @@ class Interpreter(ExprVisitor):
 
     def evaluate(self, expr):
         return expr.accept(self)
+
+    def execute(self, stmt):
+        stmt.accept(self)
+
+    def execute_block(self, statements, new_env):
+        """
+        To execute code within a given scope, this method updates the interpreter's
+        `environment` field, visits all the statements, then restores the previous value.
+        """
+        prev_env = self.environment
+        try:
+            self.environment = new_env
+            for statement in statements:
+                self.execute(statement)
+        finally:
+            self.environment = prev_env
+
+    def visit_block(self, stmt):
+        self.execute_block(stmt.statements, Environment(enclosing=self.environment))
+        return None
+
+    def visit_expression(self, stmt):
+        self.evaluate(stmt.expression)
+        return None
+
+    def visit_print(self, stmt):
+        value = self.evaluate(stmt.expression)
+        print(self.stringify(value))
+        return None
+
+    def visit_var(self, stmt):
+        value = None
+        if stmt.initializer is not None:
+            value = self.evaluate(stmt.initializer)
+        self.environment.define(stmt.name.lexeme, value)
+        return None
+
+    def visit_variable(self, expr):
+        return self.environment.get(expr.name)
+
+    def visit_assign(self, expr):
+        value = self.evaluate(expr.value)
+        self.environment.assign(expr.name, value)
+        return value
     
     @staticmethod
     def is_truthy(value):
@@ -122,8 +164,14 @@ class Interpreter(ExprVisitor):
                 if text.endswith(".0"):
                     text = text[:-2]
                 return text
-            case _:
+            case bool():
+                if obj:
+                    return "true"
+                return "false"
+            case str():
                 return f'"{str(obj)}"'
+            case _:
+                return str(obj)
 
 def interpret(expr):
     match expr:

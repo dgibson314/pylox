@@ -3,32 +3,42 @@ import sys
 TAB = "    "
 
 expr_types = {
+    "Assign"  : ["name", "value"],
     "Binary"  : ["left", "operator", "right"],
     "Grouping": ["expression"],
     "Literal" : ["value"],
-    "Unary"   : ["operator", "right"]
+    "Unary"   : ["operator", "right"],
+    "Variable": ["name"],
 }
 
-def define_ast(path, base_name, types):
-    with open(path, "w") as f:
+stmt_types = {
+    "Block"      : ["statements"],
+    "Expression" : ["expression"],
+    "Print"      : ["expression"],
+    "Var"        : ["name", "initializer"],
+}
+
+def define_ast(output_dir, base_name, types):
+    filepath = f"{output_dir}/{base_name.lower()}.py"
+    with open(filepath, "w") as f:
         f.write("from abc import ABC, abstractmethod\n")
         f.write("\n\n")
         
-        define_visitorclass(f)
+        define_visitorclass(f, base_name, types)
         f.write("\n\n")
 
         define_baseclass(f, base_name)
 
-        for cls_name, fields in expr_types.items():
+        for cls_name, fields in types.items():
             define_type(f, base_name, cls_name, fields)
 
 
-def define_visitorclass(f):
+def define_visitorclass(f, base_name, types):
     functions = [
-        f"{TAB}def visit_{expr_type.lower()}(expr): raise NotImplementedError\n" \
-        for expr_type in expr_types.keys()
+        f"{TAB}def visit_{field.lower()}(expr): raise NotImplementedError\n" \
+        for field in types.keys()
     ]
-    f.write(f"class ExprVisitor():\n")
+    f.write(f"class {base_name}Visitor():\n")
     f.writelines(functions)
 
 
@@ -66,3 +76,4 @@ if __name__ == "__main__":
 
     output_dir = sys.argv[1]
     define_ast(output_dir, "Expr", expr_types)
+    define_ast(output_dir, "Stmt", stmt_types)

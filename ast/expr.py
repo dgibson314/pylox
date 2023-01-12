@@ -2,16 +2,27 @@ from abc import ABC, abstractmethod
 
 
 class ExprVisitor():
+    def visit_assign(expr): raise NotImplementedError
     def visit_binary(expr): raise NotImplementedError
     def visit_grouping(expr): raise NotImplementedError
     def visit_literal(expr): raise NotImplementedError
     def visit_unary(expr): raise NotImplementedError
+    def visit_variable(expr): raise NotImplementedError
 
 
 class Expr(ABC):
     @abstractmethod
     def accept(self):
         raise NotImplementedError
+
+
+class Assign(Expr):
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    def accept(self, visitor):
+        return visitor.visit_assign(self)
 
 
 class Binary(Expr):
@@ -47,5 +58,13 @@ class Unary(Expr):
 
     def accept(self, visitor):
         return visitor.visit_unary(self)
+
+
+class Variable(Expr):
+    def __init__(self, name):
+        self.name = name
+
+    def accept(self, visitor):
+        return visitor.visit_variable(self)
 
 
