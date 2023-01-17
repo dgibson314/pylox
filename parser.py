@@ -16,12 +16,19 @@ class Parser():
     program        → declaration* EOF
     declaration    → varDecl | statement
     varDecl        → "var" IDENTIFIER ( "=" expression )? ";"
-    statement      → exprStmt | printStmt | block
-    block          → "{" declaration* "}"
+    statement      → exprStmt | forStmt | ifStmt | printStmt | whileStmt | block
     exprStmt       → expression ";"
+    forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+                     expression? ";"
+                     expression? ")" statement
+    ifStmt         → "if" "(" expression ")" statement ( "else" statement )?
     printStmt      → "print" expression ";"
+    whileStmt      → "while" "(" expression ")" statement
+    block          → "{" declaration* "}"
     expression     → assignment
-    assignment     → IDENTIFIER "=" assignment | equality
+    assignment     → IDENTIFIER "=" assignment | logic_or
+    logic_or       → logic_and ( "or" logic_and )*
+    logic_and      → equality ( "and" equality )*
     equality       → comparison ( ( "!=" | "==" ) comparison )*
     comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
     term           → factor ( ( "-" | "+" ) factor )*
@@ -59,13 +66,81 @@ class Parser():
 
     def statement(self):
         """
-        statement -> exprStmt | printStmt
+        statement -> exprStmt | forStmt| ifStmt | printStmt | whileStmt | block
         """
+        if self.match_types(TT.FOR):
+            return self.for_statement()
+        if self.match_types(TT.IF):
+            return self.if_statement()
         if self.match_types(TT.PRINT):
             return self.print_statement()
+        if self.match_types(TT.WHILE):
+            return self.while_statement()
         elif self.match_types(TT.LEFT_BRACE):
             return Stmt.Block(self.block_statement())
         return self.expression_statement()
+
+    def for_statement(self):
+        """
+        forStmt -> "for" "(" ( varDecl | exprStmt | ";" )
+                   expression? ";"
+                   expression? ")" statement
+        Inside the parentheses we have 3 clauses:
+        1. The first clause is the iniitializer. We allow a variable declaration, in which case
+            the variable is scoped to the rest of the `for` loop - the other two clauses and body.
+        2. The condition. 
+        3. The increment.
+        Any of these clauses can be omitted.
+        """
+        self.consume(TT.LEFT_PAREN, "Expect '(' after 'for'.")
+
+        initializer = None
+        if self.match_types(TT.SEMICOLON):
+            pass
+        elif self.match_types(TT.VAR):
+            initializer = self.var_declaration()
+        else:
+            initializer = self.expression_statement()
+
+        condition = None
+        if not self.check(TT.SEMICOLON):
+            condition = self.expression()
+        self.consume(TT.SEMICOLON, "Expect ';' after loop condition.")
+
+        increment = None
+        if not self.check(TT.RIGHT_PAREN):
+            increment = self.expression()
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after 'for' clauses.")
+
+        body = self.statement()
+
+        # The increment, if there is one, executes after the body in each iteration of the loop
+        if increment:
+            body = Stmt.Block([body, Stmt.Expression(increment)])
+
+        if condition is None:
+            condition = Expr.Literal(True)
+        body = Stmt.While(condition, body)
+
+        # If there's an initializer, it runs once before the entire loop
+        if initializer:
+            body = Stmt.Block([initializer, body])
+
+        return body
+
+    def if_statement(self):
+        """
+        ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
+        """
+        self.consume(TT.LEFT_PAREN, "Expect '(' after 'if'.")
+        condition = self.expression()
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after 'if' condition.")
+
+        then_branch = self.statement()
+        else_branch = None
+        if self.match_types(TT.ELSE):
+            else_branch = self.statement()
+        return Stmt.If(condition, then_branch, else_branch)
 
     def print_statement(self):
         """
@@ -83,6 +158,16 @@ class Parser():
             initializer = self.expression()
         self.consume(TT.SEMICOLON, "Expect ';' after variable declaration.")
         return Stmt.Var(name, initializer)
+
+    def while_statement(self):
+        """
+        whileStmt = "while" "(" expression ")" statement
+        """
+        self.consume(TT.LEFT_PAREN, "Expect '(' after 'while'.")
+        condition = self.expression()
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after condition.")
+        body = self.statement()
+        return Stmt.While(condition, body)
 
     def expression_statement(self):
         """
@@ -103,9 +188,9 @@ class Parser():
 
     def assignment(self):
         """
-        assignment -> IDENTIFIER "=" assignment | equality
+        assignment -> IDENTIFIER "=" assignment | logic_or
         """
-        expr = self.equality()
+        expr = self._or()
 
         if self.match_types(TT.EQUAL):
             equals = self.previous()
@@ -115,6 +200,22 @@ class Parser():
                 return Expr.Assign(expr.name, value)
             self.error(equals, "Invalid assignment target.")
 
+        return expr
+
+    def _or(self):
+        expr = self._and()
+        while self.match_types(TT.OR):
+            operator = self.previous()
+            right = self._and()
+            expr = Expr.Logical(expr, operator, right)
+        return expr
+
+    def _and(self):
+        expr = self.equality()
+        while self.match_types(TT.AND):
+            operator = self.previous()
+            right = self.equality()
+            expr = Expr.Logical(expr, operator, right)
         return expr
 
     def expression(self):

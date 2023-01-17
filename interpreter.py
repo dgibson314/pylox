@@ -21,6 +21,29 @@ class Interpreter(ExprVisitor, StmtVisitor):
     def visit_literal(self, expr):
         return expr.value
 
+    def visit_logical(self, expr):
+        """
+        Since Lox is dynamically typed, we allow operands of any type and use
+        truthiness to determine what each operand represents. We apply similar
+        reasoning to the result. Instead of promising to literally return `true`
+        or `false`, the logic operator returns the results of the operands 
+        themselves.
+        Example:
+            > print "hi" or 2;  // "hi"
+            > print nil or "yes"; // "yes"
+        """
+        left = self.evaluate(expr.left)
+
+        # Short circuit on OR statements where the lhs is true
+        if (expr.operator.type == TT.OR):
+            if self.is_truthy(left):
+                return left
+        # Short circuit on AND statements where the lhs is false
+        else:
+            if not self.is_truthy(left):
+                return left
+        return self.evaluate(expr.right)
+
     def visit_grouping(self, expr):
         return self.evaluate(expr.expression)
 
@@ -114,6 +137,13 @@ class Interpreter(ExprVisitor, StmtVisitor):
         self.evaluate(stmt.expression)
         return None
 
+    def visit_if(self, stmt):
+        if self.is_truthy(self.evaluate(stmt.condition)):
+            self.execute(stmt.then_branch)
+        elif stmt.else_branch:
+            self.execute(stmt.else_branch)
+        return None
+
     def visit_print(self, stmt):
         value = self.evaluate(stmt.expression)
         print(self.stringify(value))
@@ -124,6 +154,11 @@ class Interpreter(ExprVisitor, StmtVisitor):
         if stmt.initializer is not None:
             value = self.evaluate(stmt.initializer)
         self.environment.define(stmt.name.lexeme, value)
+        return None
+
+    def visit_while(self, stmt):
+        while self.is_truthy(self.evaluate(stmt.condition)):
+            self.execute(stmt.body)
         return None
 
     def visit_variable(self, expr):
@@ -172,59 +207,3 @@ class Interpreter(ExprVisitor, StmtVisitor):
                 return f'"{str(obj)}"'
             case _:
                 return str(obj)
-
-def interpret(expr):
-    match expr:
-        case Literal():
-            return expr.value
-        case Grouping():
-            return interpret(expr.expression)
-        case Unary():
-            right = interpret(expr.right)
-            match expr.operator.type:
-                case TT.MINUS:
-                    return -right
-                case TT.BANG:
-                    return (not is_truthy(right))
-        case Binary():
-            left = interpret(expr.left)
-            right = interpret(expr.right)
-            match expr.operator.type:
-                case TT.GREATER:
-                    return left > right
-                case TT.GREATER_EQUAL:
-                    return left >= right
-                case TT.LESS:
-                    return left < right
-                case TT.LESS_EQUAL:
-                    return left <= right
-                case TT.BANG_EQUAL:
-                    return not is_equal(left, right)
-                case TT.EQUAL_EQUAL:
-                    return is_equal(left, right)
-                case TT.MINUS:
-                    return left - right
-                case TT.SLASH:
-                    return left / right
-                case TT.STAR:
-                    return left * right
-                case TT.PLUS:
-                    match left, right:
-                        case float(), float() | str(), str():
-                            return left + right
-                        case _:
-                            # TODO: handle better
-                            print("Can't add different types!")
-                            return None
-
-
-def is_truthy(value):
-    if value is None: return False
-    if isinstance(value, bool): return value
-    return True
-
-
-def is_equal(x, y):
-    if (x is None and b is None): return True
-    if x is None: return False
-    return x == y

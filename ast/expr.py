@@ -6,6 +6,7 @@ class ExprVisitor():
     def visit_binary(expr): raise NotImplementedError
     def visit_grouping(expr): raise NotImplementedError
     def visit_literal(expr): raise NotImplementedError
+    def visit_logical(expr): raise NotImplementedError
     def visit_unary(expr): raise NotImplementedError
     def visit_variable(expr): raise NotImplementedError
 
@@ -49,6 +50,16 @@ class Literal(Expr):
 
     def accept(self, visitor):
         return visitor.visit_literal(self)
+
+
+class Logical(Expr):
+    def __init__(self, left, operator, right):
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    def accept(self, visitor):
+        return visitor.visit_logical(self)
 
 
 class Unary(Expr):

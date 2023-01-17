@@ -10,9 +10,8 @@ class Environment():
         self.values[name] = value
 
     def get(self, name):
-        var = self.values.get(name.lexeme)
-        if var:
-            return var
+        if name.lexeme in self.values.keys():
+            return self.values[name.lexeme]
 
         # If variable isn't found in this environment, we try the enclosing one
         if self.enclosing:
@@ -27,5 +26,6 @@ class Environment():
 
         if self.enclosing:
             self.enclosing.assign(name, value)
+            return
 
         raise RuntimeException(name, f"Undefined variable '{name.lexeme}'.")
