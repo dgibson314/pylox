@@ -5,9 +5,10 @@ TAB = "    "
 expr_types = {
     "Assign"  : ["name", "value"],
     "Binary"  : ["left", "operator", "right"],
+    "Call"    : ["callee", "paren", "arguments"],
     "Grouping": ["expression"],
     "Literal" : ["value"],
-    "Logical"  : ["left", "operator", "right"],
+    "Logical" : ["left", "operator", "right"],
     "Unary"   : ["operator", "right"],
     "Variable": ["name"],
 }
@@ -15,8 +16,10 @@ expr_types = {
 stmt_types = {
     "Block"      : ["statements"],
     "Expression" : ["expression"],
+    "Function"   : ["name", "params", "body"],
     "If"         : ["condition", "then_branch", "else_branch"],
     "Print"      : ["expression"],
+    "Return"     : ["keyword", "value"],
     "Var"        : ["name", "initializer"],
     "While"      : ["condition", "body"],
 }

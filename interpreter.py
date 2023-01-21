@@ -1,15 +1,19 @@
 from ast.expr import ExprVisitor
 from ast.stmt import StmtVisitor
 from environment import Environment
-from exceptions import RuntimeException
+from exceptions import RuntimeException, Return
+from lox_callable import LoxCallable, ClockCallable, LoxFunction
 from token import Token
 from token_type import TokenType as TT
 
 
 class Interpreter(ExprVisitor, StmtVisitor):
+    _globals = Environment()
+    _globals.define("clock", ClockCallable())
+
     def __init__(self, runtime):
         self.runtime = runtime
-        self.environment = Environment()
+        self.environment = self._globals
 
     def interpret(self, statements):
         try:
@@ -110,6 +114,19 @@ class Interpreter(ExprVisitor, StmtVisitor):
                         msg = "Operands must be two numbers or two string"
                         raise RuntimeException(expr.operator, msg)
 
+    def visit_call(self, expr):
+        callee = self.evaluate(expr.callee)
+        arguments = [self.evaluate(arg) for arg in expr.arguments]
+
+        if not isinstance(callee, LoxCallable):
+            raise RuntimeException(expr.paren, "Can only call functions and classes.")
+
+        if len(arguments) != callee.arity():
+            raise RuntimeException(expr.paren,
+                    f"Expected {function.arity()} arguments but got {len(arguments)}.")
+
+        return callee(self, arguments)
+
     def evaluate(self, expr):
         return expr.accept(self)
 
@@ -137,6 +154,11 @@ class Interpreter(ExprVisitor, StmtVisitor):
         self.evaluate(stmt.expression)
         return None
 
+    def visit_function(self, stmt):
+        function = LoxFunction(stmt, self.environment)
+        self.environment.define(stmt.name.lexeme, function)
+        return None
+
     def visit_if(self, stmt):
         if self.is_truthy(self.evaluate(stmt.condition)):
             self.execute(stmt.then_branch)
@@ -148,6 +170,12 @@ class Interpreter(ExprVisitor, StmtVisitor):
         value = self.evaluate(stmt.expression)
         print(self.stringify(value))
         return None
+
+    def visit_return(self, stmt):
+        value = None
+        if stmt.value:
+            value = self.evaluate(stmt.value)
+        raise Return(value)
 
     def visit_var(self, stmt):
         value = None

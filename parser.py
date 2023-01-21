@@ -14,15 +14,19 @@ class Parser():
     EXPRESSION GRAMMAR
     ------------------
     program        → declaration* EOF
-    declaration    → varDecl | statement
+    declaration    → funDecl | varDecl | statement
+    funDecl        → "fun" function
+    function       → IDENTIFIER "(" parameters? ")" block
+    parameters     → IDENTIFIER ( "," IDENTIFIER )*
     varDecl        → "var" IDENTIFIER ( "=" expression )? ";"
-    statement      → exprStmt | forStmt | ifStmt | printStmt | whileStmt | block
+    statement      → exprStmt | forStmt | ifStmt | printStmt | returnStmt | whileStmt | block
     exprStmt       → expression ";"
     forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
                      expression? ";"
                      expression? ")" statement
     ifStmt         → "if" "(" expression ")" statement ( "else" statement )?
     printStmt      → "print" expression ";"
+    returnStmt     → "return" expression? ";"
     whileStmt      → "while" "(" expression ")" statement
     block          → "{" declaration* "}"
     expression     → assignment
@@ -33,8 +37,9 @@ class Parser():
     comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )*
     term           → factor ( ( "-" | "+" ) factor )*
     factor         → unary ( ( "/" | "*" ) unary )*
-    unary          → ( "!" | "-" ) unary
-                   | primary
+    unary          → ( "!" | "-" ) unary | call
+    call           → primary ( "(" arguments? ")" )*
+    arguments      → expression ( "," expression )*
     primary        → NUMBER | STRING | "true" | "false" | "nil"
                    | "(" expression ")" | IDENTIFIER
     """
@@ -54,9 +59,11 @@ class Parser():
 
     def declaration(self):
         """
-        declaration -> varDecl | statement
+        declaration -> funDecl | varDecl | statement
         """
         try:
+            if self.match_types(TT.FUN):
+                return self.function("function")
             if self.match_types(TT.VAR):
                 return self.var_declaration()
             return self.statement()
@@ -66,7 +73,7 @@ class Parser():
 
     def statement(self):
         """
-        statement -> exprStmt | forStmt| ifStmt | printStmt | whileStmt | block
+        statement -> exprStmt | forStmt| ifStmt | printStmt | returnStmt | whileStmt | block
         """
         if self.match_types(TT.FOR):
             return self.for_statement()
@@ -74,6 +81,8 @@ class Parser():
             return self.if_statement()
         if self.match_types(TT.PRINT):
             return self.print_statement()
+        if self.match_types(TT.RETURN):
+            return self.return_statement()
         if self.match_types(TT.WHILE):
             return self.while_statement()
         elif self.match_types(TT.LEFT_BRACE):
@@ -150,6 +159,18 @@ class Parser():
         self.consume(TT.SEMICOLON, "Expect ';' after value.")
         return Stmt.Print(value)
 
+    def return_statement(self):
+        """
+        returnStmt -> "return" expression? ";"
+        """
+        keyword = self.previous()
+        value = None
+        if not self.check(TT.SEMICOLON):
+            value = self.expression()
+
+        self.consume(TT.SEMICOLON, "Expect ';' after return value.")
+        return Stmt.Return(keyword, value)
+
     def var_declaration(self):
         name = self.consume(TT.IDENTIFIER, "Expect variable name.")
 
@@ -176,6 +197,24 @@ class Parser():
         expr = self.expression()
         self.consume(TT.SEMICOLON, "Expect ';' after expression.")
         return Stmt.Expression(expr)
+
+    def function(self, kind):
+        name = self.consume(TT.IDENTIFIER, f"Expect {kind} name.")
+        self.consume(TT.LEFT_PAREN, f"Expect '(' after {kind} name.")
+        parameters = []
+        if not self.check(TT.RIGHT_PAREN):
+            parameters.append(self.consume(TT.IDENTIFIER, "Expect parameter name."))
+            while self.match_types(TT.COMMA):
+                if len(parameters) >= 255:
+                    self.error(self.peek(), "Can't have more than 255 parameters.")
+                parameters.append(self.consume(TT.IDENTIFIER, "Expect parameter name."))
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after parameters.")
+
+        # Consume '{' before calling `block_statement()`. That's bc `block_statement()` assumes
+        # the brace token has already been matched.
+        self.consume(TT.LEFT_BRACE, "Expect '{' before " + kind + " body")
+        body = self.block_statement()
+        return Stmt.Function(name, parameters, body)
 
     def block_statement(self):
         """
@@ -278,14 +317,39 @@ class Parser():
 
     def unary(self):
         """
-        unary -> ( "!" | "-" ) unary | primary
+        unary -> ( "!" | "-" ) unary | call
         """
         if self.match_types(TT.BANG, TT.MINUS):
             operator = self.previous()
             right = self.unary()
             return Expr.Unary(operator, right)
 
-        return self.primary()
+        return self.call()
+
+    def call(self):
+        """
+        call -> primary ( "(" arguments? ")" )*
+        arguments -> expression ( "," expression )*
+        """
+        expr = self.primary()
+        while True:
+            if self.match_types(TT.LEFT_PAREN):
+                expr = self.finish_call(expr)
+            else:
+                break
+        return expr
+
+    def finish_call(self, callee):
+        arguments = []
+        if not self.check(TT.RIGHT_PAREN):
+            arguments.append(self.expression())
+            while self.match_types(TT.COMMA):
+                if len(arguments) >= 255:
+                    self.error(self.peek(), "Can't have more than 255 arguments.")
+                arguments.append(self.expression())
+
+        paren = self.consume(TT.RIGHT_PAREN, "Expect ')' after arguments.")
+        return Expr.Call(callee, paren, arguments)
 
     def primary(self):
         """

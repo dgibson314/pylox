@@ -4,8 +4,10 @@ from abc import ABC, abstractmethod
 class StmtVisitor():
     def visit_block(expr): raise NotImplementedError
     def visit_expression(expr): raise NotImplementedError
+    def visit_function(expr): raise NotImplementedError
     def visit_if(expr): raise NotImplementedError
     def visit_print(expr): raise NotImplementedError
+    def visit_return(expr): raise NotImplementedError
     def visit_var(expr): raise NotImplementedError
     def visit_while(expr): raise NotImplementedError
 
@@ -32,6 +34,16 @@ class Expression(Stmt):
         return visitor.visit_expression(self)
 
 
+class Function(Stmt):
+    def __init__(self, name, params, body):
+        self.name = name
+        self.params = params
+        self.body = body
+
+    def accept(self, visitor):
+        return visitor.visit_function(self)
+
+
 class If(Stmt):
     def __init__(self, condition, then_branch, else_branch):
         self.condition = condition
@@ -48,6 +60,15 @@ class Print(Stmt):
 
     def accept(self, visitor):
         return visitor.visit_print(self)
+
+
+class Return(Stmt):
+    def __init__(self, keyword, value):
+        self.keyword = keyword
+        self.value = value
+
+    def accept(self, visitor):
+        return visitor.visit_return(self)
 
 
 class Var(Stmt):

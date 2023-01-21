@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 class ExprVisitor():
     def visit_assign(expr): raise NotImplementedError
     def visit_binary(expr): raise NotImplementedError
+    def visit_call(expr): raise NotImplementedError
     def visit_grouping(expr): raise NotImplementedError
     def visit_literal(expr): raise NotImplementedError
     def visit_logical(expr): raise NotImplementedError
@@ -34,6 +35,16 @@ class Binary(Expr):
 
     def accept(self, visitor):
         return visitor.visit_binary(self)
+
+
+class Call(Expr):
+    def __init__(self, callee, paren, arguments):
+        self.callee = callee
+        self.paren = paren
+        self.arguments = arguments
+
+    def accept(self, visitor):
+        return visitor.visit_call(self)
 
 
 class Grouping(Expr):
