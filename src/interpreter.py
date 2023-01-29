@@ -1,5 +1,16 @@
-from ast.expr import ExprVisitor
-from ast.stmt import StmtVisitor
+import os
+import sys
+
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(THIS_DIR, "..")
+AST_DIR = os.path.join(BASE_DIR, "pylox_ast")
+
+for path in [BASE_DIR, AST_DIR]:
+    if path not in sys.path:
+        sys.path.append(path)
+
+from pylox_ast.expr import ExprVisitor
+from pylox_ast.stmt import StmtVisitor
 from environment import Environment
 from exceptions import RuntimeException, Return
 from lox_callable import LoxCallable, ClockCallable, LoxFunction
