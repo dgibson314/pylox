@@ -1,5 +1,17 @@
-import ast.expr as Expr
-import ast.stmt as Stmt
+import os
+import sys
+
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(THIS_DIR, "..")
+AST_DIR = os.path.join(BASE_DIR, "pylox_ast")
+
+for path in [BASE_DIR, AST_DIR]:
+    if path not in sys.path:
+        sys.path.append(path)
+
+
+import pylox_ast.expr as Expr
+import pylox_ast.stmt as Stmt
 
 from token import Token
 from token_type import TokenType as TT
