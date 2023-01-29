@@ -10,8 +10,8 @@ for path in [BASE_DIR, AST_DIR]:
         sys.path.append(path)
 
 
+from lox_token import Token
 from pylox_ast.expr import *
-from token import Token
 from token_type import TokenType as TT
 
 from ast_printer import pretty_printer, parenthesize

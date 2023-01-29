@@ -2,9 +2,9 @@ import sys
 
 from ast_printer import AstPrinter
 from interpreter import Interpreter
+from lox_token import Token
 from parser import Parser
 from scanner import Scanner
-from token import Token
 from token_type import TokenType
 
 class Lox():

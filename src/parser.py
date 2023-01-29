@@ -13,7 +13,7 @@ for path in [BASE_DIR, AST_DIR]:
 import pylox_ast.expr as Expr
 import pylox_ast.stmt as Stmt
 
-from token import Token
+from lox_token import Token
 from token_type import TokenType as TT
 
 

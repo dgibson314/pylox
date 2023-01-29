@@ -14,7 +14,7 @@ from pylox_ast.stmt import StmtVisitor
 from environment import Environment
 from exceptions import RuntimeException, Return
 from lox_callable import LoxCallable, ClockCallable, LoxFunction
-from token import Token
+from lox_token import Token
 from token_type import TokenType as TT
 
 
