@@ -11,11 +11,11 @@ for path in [BASE_DIR, AST_DIR]:
 
 from pylox_ast.expr import ExprVisitor
 from pylox_ast.stmt import StmtVisitor
-from environment import Environment
-from exceptions import RuntimeException, Return
-from lox_callable import LoxCallable, ClockCallable, LoxFunction
-from lox_token import Token
-from token_type import TokenType as TT
+from src.environment import Environment
+from src.exceptions import RuntimeException, Return
+from src.lox_callable import LoxCallable, ClockCallable, LoxFunction
+from src.lox_token import Token
+from src.token_type import TokenType as TT
 
 
 class Interpreter(ExprVisitor, StmtVisitor):

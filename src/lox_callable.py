@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import time
 
-from environment import Environment
-from exceptions import Return
+from src.environment import Environment
+from src.exceptions import Return
 
 
 class LoxCallable(ABC):

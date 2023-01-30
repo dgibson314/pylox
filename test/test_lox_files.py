@@ -3,20 +3,9 @@ import os
 import pytest
 import sys
 
-
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(THIS_DIR, "..")
-SRC_DIR = os.path.join(BASE_DIR, "src")
-AST_DIR = os.path.join(BASE_DIR, "pylox_ast")
-
-for path in [BASE_DIR, SRC_DIR, AST_DIR]:
-    if path not in sys.path:
-        sys.path.append(path)
-
-
 from src.lox import Lox
 
-
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 LOX_TEST_FILES = os.path.join(THIS_DIR, "lox_test_files")
 PYLOX_FUNCTION_VALUES = os.path.join(THIS_DIR, "pylox_function_values.json")
 
