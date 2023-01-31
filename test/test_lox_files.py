@@ -21,5 +21,20 @@ def test_lox_file(capsys, lox_program, expected):
     assert output == expected
 
 
-with open(PYLOX_FUNCTION_VALUES, "r") as j:
-    print(json.load(j))
+TEST_PROG = \
+        """
+        print 2 + 2;
+        """
+
+EXPECTED = ["4"]
+
+
+def test_sum(capsys):
+    lox = Lox()
+    lox.run(TEST_PROG)
+
+    assert not lox.had_error
+    assert not lox.had_runtime_error
+
+    output = capsys.readouterr().out.splitlines()
+    assert output == EXPECTED
