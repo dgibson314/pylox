@@ -5,6 +5,7 @@ from src.ast_printer import AstPrinter
 from src.interpreter import Interpreter
 from src.lox_token import Token
 from src.parser import Parser
+from src.resolver import Resolver
 from src.scanner import Scanner
 from src.token_type import TokenType
 
@@ -45,6 +46,9 @@ class Lox():
 
         # Stop if there was a syntax error
         if self.had_error: return
+
+        resolver = Resolver(self.interpreter, self)
+        resolver.resolve(statements)
         
         self.interpreter.interpret(statements)
 
@@ -64,12 +68,3 @@ class Lox():
     def report(self, line, where, message):
         print(f"[line {line}] Error{where}: {message}")
         self.had_error = True
-
-if __name__ == "__main__":
-    lox = Lox()
-    if len(sys.argv) > 2:
-        print("Usage: jlox [script]")
-    elif len(sys.argv) == 2:
-        lox.run_file(sys.argv[1])
-    else:
-        lox.run_prompt()
