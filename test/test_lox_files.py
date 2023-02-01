@@ -4,37 +4,21 @@ import pytest
 import sys
 
 from src.lox import Lox
+from test.lox_test_cases import LOX_FUNCTIONS_EXPECTED_VALUES
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-LOX_TEST_FILES = os.path.join(THIS_DIR, "lox_test_files")
-PYLOX_FUNCTION_VALUES = os.path.join(THIS_DIR, "pylox_function_values.json")
 
-@pytest.mark.parametrize("lox_program,expected", [("print 2 + 2; print 3 + 3;", ["4", "6"])])
-def test_lox_file(capsys, lox_program, expected):
+
+@pytest.mark.parametrize("lox_program_expected", LOX_FUNCTIONS_EXPECTED_VALUES)
+def test_lox_program(capsys, lox_program_expected):
     lox = Lox()
+
+    lox_program, expected_value = lox_program_expected
     lox.run(lox_program)
 
     assert not lox.had_error
     assert not lox.had_runtime_error
 
     output = capsys.readouterr().out.splitlines()
-    assert output == expected
+    assert output == expected_value
 
-
-TEST_PROG = \
-        """
-        print 2 + 2;
-        """
-
-EXPECTED = ["4"]
-
-
-def test_sum(capsys):
-    lox = Lox()
-    lox.run(TEST_PROG)
-
-    assert not lox.had_error
-    assert not lox.had_runtime_error
-
-    output = capsys.readouterr().out.splitlines()
-    assert output == EXPECTED
