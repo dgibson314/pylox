@@ -1,11 +1,12 @@
+import os
 import sys
 
-from ast_printer import AstPrinter
-from interpreter import Interpreter
-from parser import Parser
-from scanner import Scanner
-from token import Token
-from token_type import TokenType
+from src.ast_printer import AstPrinter
+from src.interpreter import Interpreter
+from src.lox_token import Token
+from src.parser import Parser
+from src.scanner import Scanner
+from src.token_type import TokenType
 
 class Lox():
     def __init__(self):

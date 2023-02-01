@@ -1,5 +1,5 @@
-from token_type import TokenType as TT
-from token import Token
+from src.lox_token import Token
+from src.token_type import TokenType as TT
 
 class Scanner():
     keywords = {

@@ -1,17 +1,9 @@
 import os
 import sys
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(THIS_DIR, "..")
-AST_DIR = os.path.join(BASE_DIR, "pylox_ast")
-
-for path in [BASE_DIR, AST_DIR]:
-    if path not in sys.path:
-        sys.path.append(path)
-
 from pylox_ast.expr import *
-from token import Token
-from token_type import TokenType as TT
+from src.lox_token import Token
+from src.token_type import TokenType as TT
 
 
 class AstPrinter(ExprVisitor):

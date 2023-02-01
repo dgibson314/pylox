@@ -13,8 +13,8 @@ for path in [BASE_DIR, AST_DIR]:
 import pylox_ast.expr as Expr
 import pylox_ast.stmt as Stmt
 
-from token import Token
-from token_type import TokenType as TT
+from src.lox_token import Token
+from src.token_type import TokenType as TT
 
 
 class ParserException(Exception):
