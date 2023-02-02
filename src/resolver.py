@@ -110,38 +110,34 @@ class Resolver(ExprVisitor, StmtVisitor):
         if var.initializer:
             self.resolve(var.initializer)
         self.define(var.name)
-        return None
 
     def visit_while(self, stmt):
         self.resolve(stmt.condition)
         self.resolve(stmt.body)
-        return None
 
     def visit_variable(self, expr):
         if self.scopes and (self.scopes[-1].get(expr.name.lexeme, None) is False):
             self.runtime.error(expr.name, "Can't read local variable in its own initializer")
         self.resolve_local(expr, expr.name)
-        return None
 
     def visit_assign(self, expr):
         self.resolve(expr.value)
         self.resolve_local(expr, expr.name)
-        return None
 
     def visit_binary(self, expr):
         self.resolve(expr.left)
         self.resolve(expr.right)
-        return None
 
     def visit_call(self, expr):
         self.resolve(expr.callee)
         for arg in expr.arguments:
             self.resolve(arg)
-        return None
+
+    def visit_get(self, expr):
+        self.resolve(expr.object_)
 
     def visit_grouping(self, expr):
         self.resolve(expr.expression)
-        return None
 
     def visit_literal(self, expr):
         return None
@@ -149,11 +145,10 @@ class Resolver(ExprVisitor, StmtVisitor):
     def visit_logical(self, expr):
         self.resolve(expr.left)
         self.resolve(expr.right)
-        return None
+
+    def visit_set(self, expr):
+        self.resolve(expr.value)
+        self.resolve(expr.object_)
 
     def visit_unary(self, expr):
         self.resolve(expr.right)
-        return None
-
-
-

@@ -6,9 +6,11 @@ expr_types = {
     "Assign"  : ["name", "value"],
     "Binary"  : ["left", "operator", "right"],
     "Call"    : ["callee", "paren", "arguments"],
+    "Get"     : ["object_", "name"],
     "Grouping": ["expression"],
     "Literal" : ["value"],
     "Logical" : ["left", "operator", "right"],
+    "Set"     : ["object_", "name", "value"],
     "Unary"   : ["operator", "right"],
     "Variable": ["name"],
 }

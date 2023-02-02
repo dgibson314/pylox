@@ -6,3 +6,6 @@ class Test {
 
 var test = Test();
 print test;
+
+test.field = 1;
+print test.field;

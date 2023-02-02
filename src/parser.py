@@ -43,7 +43,7 @@ class Parser():
     whileStmt      → "while" "(" expression ")" statement
     block          → "{" declaration* "}"
     expression     → assignment
-    assignment     → IDENTIFIER "=" assignment | logic_or
+    assignment     → ( call "." )? IDENTIFIER "=" assignment | logic_or
     logic_or       → logic_and ( "or" logic_and )*
     logic_and      → equality ( "and" equality )*
     equality       → comparison ( ( "!=" | "==" ) comparison )*
@@ -51,7 +51,7 @@ class Parser():
     term           → factor ( ( "-" | "+" ) factor )*
     factor         → unary ( ( "/" | "*" ) unary )*
     unary          → ( "!" | "-" ) unary | call
-    call           → primary ( "(" arguments? ")" )*
+    call           → primary ( "(" arguments? ")" | "." IDENTIFIER )*
     arguments      → expression ( "," expression )*
     primary        → NUMBER | STRING | "true" | "false" | "nil"
                    | "(" expression ")" | IDENTIFIER
@@ -254,7 +254,7 @@ class Parser():
 
     def assignment(self):
         """
-        assignment -> IDENTIFIER "=" assignment | logic_or
+        assignment -> ( call "." )? IDENTIFIER "=" assignment | logic_or
         """
         expr = self._or()
 
@@ -264,6 +264,8 @@ class Parser():
 
             if isinstance(expr, Expr.Variable):
                 return Expr.Assign(expr.name, value)
+            elif isinstance(expr, Expr.Get):
+                return Expr.Set(expr.object_, expr.name, value)
             self.error(equals, "Invalid assignment target.")
 
         return expr
@@ -355,13 +357,16 @@ class Parser():
 
     def call(self):
         """
-        call -> primary ( "(" arguments? ")" )*
+        call -> primary ( "(" arguments? ")" | "." IDENTIFIER )*
         arguments -> expression ( "," expression )*
         """
         expr = self.primary()
         while True:
             if self.match_types(TT.LEFT_PAREN):
                 expr = self.finish_call(expr)
+            elif self.match_types(TT.DOT):
+                name = self.consume(TT.IDENTIFIER, "Expect property name after '.'.")
+                expr = Expr.Get(expr, name)
             else:
                 break
         return expr
