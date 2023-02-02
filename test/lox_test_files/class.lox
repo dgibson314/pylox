@@ -1,0 +1,7 @@
+class Test {
+  foo() {
+    return "bar";
+  }
+}
+
+print Test;

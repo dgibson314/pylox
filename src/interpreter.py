@@ -1,19 +1,12 @@
 import os
 import sys
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(THIS_DIR, "..")
-AST_DIR = os.path.join(BASE_DIR, "pylox_ast")
-
-for path in [BASE_DIR, AST_DIR]:
-    if path not in sys.path:
-        sys.path.append(path)
-
 from pylox_ast.expr import ExprVisitor
 from pylox_ast.stmt import StmtVisitor
 from src.environment import Environment
 from src.exceptions import RuntimeException, Return
 from src.lox_callable import LoxCallable, ClockCallable, LoxFunction
+from src.lox_class import LoxClass
 from src.lox_token import Token
 from src.token_type import TokenType as TT
 
@@ -161,6 +154,12 @@ class Interpreter(ExprVisitor, StmtVisitor):
 
     def visit_block(self, stmt):
         self.execute_block(stmt.statements, Environment(enclosing=self.environment))
+        return None
+
+    def visit_class(self, stmt):
+        self.environment.define(stmt.name.lexeme, None)
+        klass = LoxClass(stmt.name.lexeme)
+        self.environment.assign(stmt.name, klass)
         return None
 
     def visit_expression(self, stmt):

@@ -26,7 +26,8 @@ class Parser():
     EXPRESSION GRAMMAR
     ------------------
     program        → declaration* EOF
-    declaration    → funDecl | varDecl | statement
+    declaration    → classDecl | funDecl | varDecl | statement
+    classDecl      → "class" IDENTIFIER "{" function* "}"
     funDecl        → "fun" function
     function       → IDENTIFIER "(" parameters? ")" block
     parameters     → IDENTIFIER ( "," IDENTIFIER )*
@@ -74,6 +75,8 @@ class Parser():
         declaration -> funDecl | varDecl | statement
         """
         try:
+            if self.match_types(TT.CLASS):
+                return self.class_declaration()
             if self.match_types(TT.FUN):
                 return self.function("function")
             if self.match_types(TT.VAR):
@@ -82,6 +85,18 @@ class Parser():
         except ParserException as e:
             self.synchronize()
             return None
+
+    def class_declaration(self):
+        name = self.consume(TT.IDENTIFIER, "Expect class name.")
+        self.consume(TT.LEFT_BRACE, "Expect '{' before class body.")
+
+        methods = []
+        while (not self.check(TT.RIGHT_BRACE)) and (not self.at_end()):
+            methods.append(self.function("method"))
+
+        self.consume(TT.RIGHT_BRACE, "Expect '}' after class body.")
+        
+        return Stmt.Class(name, methods)
 
     def statement(self):
         """
