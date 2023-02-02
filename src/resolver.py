@@ -7,6 +7,7 @@ from pylox_ast.stmt import StmtVisitor
 class FunctionType(Enum):
     NONE = auto()
     FUNCTION = auto()
+    METHOD = auto()
 
 
 class Resolver(ExprVisitor, StmtVisitor):
@@ -74,7 +75,10 @@ class Resolver(ExprVisitor, StmtVisitor):
     def visit_class(self, stmt):
         self.declare(stmt.name)
         self.define(stmt.name)
-        return None
+
+        for method in stmt.methods:
+            declaration = FunctionType.METHOD
+            self.resolve_function(method, declaration)
 
     def visit_expression(self, stmt):
         self.resolve(stmt.expression)

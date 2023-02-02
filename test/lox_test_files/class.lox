@@ -9,3 +9,4 @@ print test;
 
 test.field = 1;
 print test.field;
+print test.foo();
