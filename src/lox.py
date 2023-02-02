@@ -49,6 +49,9 @@ class Lox():
 
         resolver = Resolver(self.interpreter, self)
         resolver.resolve(statements)
+
+        # Stop if there was a resolution error
+        if self.had_error: return
         
         self.interpreter.interpret(statements)
 

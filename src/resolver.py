@@ -1,5 +1,12 @@
+from enum import Enum, auto
+
 from pylox_ast.expr import ExprVisitor
 from pylox_ast.stmt import StmtVisitor
+
+
+class FunctionType(Enum):
+    NONE = auto()
+    FUNCTION = auto()
 
 
 class Resolver(ExprVisitor, StmtVisitor):
@@ -9,6 +16,7 @@ class Resolver(ExprVisitor, StmtVisitor):
         # Each element in the stack is a dict representing a single block scope.
         # Keys are variable names, values are bools.
         self.scopes = []
+        self.current_function = FunctionType.NONE
 
     def resolve(self, x):
         match x:
@@ -18,7 +26,11 @@ class Resolver(ExprVisitor, StmtVisitor):
             case _:
                 x.accept(self)
 
-    def resolve_function(self, function):
+    def resolve_function(self, function, ftype):
+        # Keep track of whether we're inside a function declaration
+        cached_ftype = self.current_function
+        self.current_function = ftype
+
         self.begin_scope()
         for param in function.params:
             self.declare(param)
@@ -26,6 +38,7 @@ class Resolver(ExprVisitor, StmtVisitor):
 
         self.resolve(function.body)
         self.end_scope()
+        self.current_function = cached_ftype
 
     def begin_scope(self):
         self.scopes.append({})
@@ -35,6 +48,8 @@ class Resolver(ExprVisitor, StmtVisitor):
 
     def declare(self, name):
         if self.scopes:
+            if name.lexeme in self.scopes[-1]:
+                self.runtime.error(name, "Already a variable with this name in this scope.")
             self.scopes[-1][name.lexeme] = False
 
     def define(self, name):
@@ -64,7 +79,7 @@ class Resolver(ExprVisitor, StmtVisitor):
         self.declare(stmt.name)
         self.define(stmt.name)
 
-        self.resolve_function(stmt)
+        self.resolve_function(stmt, FunctionType.FUNCTION)
         return None
 
     def visit_if(self, stmt):
@@ -79,6 +94,8 @@ class Resolver(ExprVisitor, StmtVisitor):
         return None
 
     def visit_return(self, stmt):
+        if self.current_function is FunctionType.NONE:
+            self.runtime.error(stmt.keyword, "Can't return from top-level code.")
         if stmt.value:
             self.resolve(stmt.value)
         return None
