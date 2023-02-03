@@ -394,6 +394,9 @@ class Parser():
         if self.match_types(TT.NUMBER, TT.STRING):
             return Expr.Literal(self.previous().literal)
 
+        if self.match_types(TT.THIS):
+            return Expr.This(self.previous())
+
         if self.match_types(TT.IDENTIFIER):
             return Expr.Variable(self.previous())
 

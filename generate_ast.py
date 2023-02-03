@@ -11,6 +11,7 @@ expr_types = {
     "Literal" : ["value"],
     "Logical" : ["left", "operator", "right"],
     "Set"     : ["object_", "name", "value"],
+    "This"    : ["keyword"],
     "Unary"   : ["operator", "right"],
     "Variable": ["name"],
 }

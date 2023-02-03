@@ -66,6 +66,9 @@ class Interpreter(ExprVisitor, StmtVisitor):
         lox_object.set(expr.name, value)
         return value
 
+    def visit_this(self, expr):
+        return self.lookup_variable(expr.keyword, expr)
+
     def visit_grouping(self, expr):
         return self.evaluate(expr.expression)
 

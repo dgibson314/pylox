@@ -10,6 +10,11 @@ class FunctionType(Enum):
     METHOD = auto()
 
 
+class ClassType(Enum):
+    NONE = auto()
+    CLASS = auto()
+
+
 class Resolver(ExprVisitor, StmtVisitor):
     def __init__(self, interpreter, runtime):
         self.interpreter = interpreter
@@ -18,6 +23,7 @@ class Resolver(ExprVisitor, StmtVisitor):
         # Keys are variable names, values are bools.
         self.scopes = []
         self.current_function = FunctionType.NONE
+        self.current_class = ClassType.NONE
 
     def resolve(self, x):
         match x:
@@ -73,12 +79,21 @@ class Resolver(ExprVisitor, StmtVisitor):
         return None
 
     def visit_class(self, stmt):
+        cached_ctype = self.current_class
+        self.current_class = ClassType.CLASS
+
         self.declare(stmt.name)
         self.define(stmt.name)
+
+        self.begin_scope()
+        self.scopes[-1]["this"] = True
 
         for method in stmt.methods:
             declaration = FunctionType.METHOD
             self.resolve_function(method, declaration)
+
+        self.end_scope()
+        self.current_class = cached_ctype
 
     def visit_expression(self, stmt):
         self.resolve(stmt.expression)
@@ -153,6 +168,13 @@ class Resolver(ExprVisitor, StmtVisitor):
     def visit_set(self, expr):
         self.resolve(expr.value)
         self.resolve(expr.object_)
+
+    def visit_this(self, expr):
+        if self.current_class is ClassType.NONE:
+            self.runtime.error(expr.keyword, "Can't use 'this' outside of a class.")
+            return None
+
+        self.resolve_local(expr, expr.keyword)
 
     def visit_unary(self, expr):
         self.resolve(expr.right)

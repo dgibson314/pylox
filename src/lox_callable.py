@@ -30,6 +30,11 @@ class LoxFunction(LoxCallable):
         self.declaration = declaration
         self.closure = closure
 
+    def bind(self, instance):
+        environment = Environment(enclosing=self.closure)
+        environment.define("this", instance)
+        return LoxFunction(self.declaration, environment)
+
     def arity(self):
         return len(self.declaration.params)
 
