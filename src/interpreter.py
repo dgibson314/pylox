@@ -1,19 +1,12 @@
 import os
 import sys
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.join(THIS_DIR, "..")
-AST_DIR = os.path.join(BASE_DIR, "pylox_ast")
-
-for path in [BASE_DIR, AST_DIR]:
-    if path not in sys.path:
-        sys.path.append(path)
-
 from pylox_ast.expr import ExprVisitor
 from pylox_ast.stmt import StmtVisitor
 from src.environment import Environment
 from src.exceptions import RuntimeException, Return
 from src.lox_callable import LoxCallable, ClockCallable, LoxFunction
+from src.lox_class import LoxClass, LoxInstance
 from src.lox_token import Token
 from src.token_type import TokenType as TT
 
@@ -59,6 +52,22 @@ class Interpreter(ExprVisitor, StmtVisitor):
             if not self.is_truthy(left):
                 return left
         return self.evaluate(expr.right)
+
+    def visit_set(self, expr):
+        """
+        Evaluate the object whose property is being set and check to see if it's a LoxInstance.
+        If not, runtime error. Otherwise, evaluate the value being set and store it on the instance.
+        """
+        lox_object = self.evaluate(expr.object_)
+
+        if not isinstance(lox_object, LoxInstance):
+            raise RuntimeException(expr.name, "Only instances have fields.")
+        value = self.evaluate(expr.value)
+        lox_object.set(expr.name, value)
+        return value
+
+    def visit_this(self, expr):
+        return self.lookup_variable(expr.keyword, expr)
 
     def visit_grouping(self, expr):
         return self.evaluate(expr.expression)
@@ -133,9 +142,16 @@ class Interpreter(ExprVisitor, StmtVisitor):
 
         if len(arguments) != callee.arity():
             raise RuntimeException(expr.paren,
-                    f"Expected {function.arity()} arguments but got {len(arguments)}.")
+                    f"Expected {callee.arity()} arguments but got {len(arguments)}.")
 
         return callee(self, arguments)
+
+    def visit_get(self, expr):
+        lox_object = self.evaluate(expr.object_)
+        if isinstance(lox_object, LoxInstance):
+            return lox_object.get(expr.name)
+
+        raise RuntimeException(expr.name, "Only instances have properties.")
 
     def evaluate(self, expr):
         return expr.accept(self)
@@ -163,12 +179,24 @@ class Interpreter(ExprVisitor, StmtVisitor):
         self.execute_block(stmt.statements, Environment(enclosing=self.environment))
         return None
 
+    def visit_class(self, stmt):
+        self.environment.define(stmt.name.lexeme, None)
+
+        methods = {}
+        for method in stmt.methods:
+            function = LoxFunction(method, self.environment, method.name.lexeme=="init")
+            methods[method.name.lexeme] = function
+
+        klass = LoxClass(stmt.name.lexeme, methods)
+        self.environment.assign(stmt.name, klass)
+        return None
+
     def visit_expression(self, stmt):
         self.evaluate(stmt.expression)
         return None
 
     def visit_function(self, stmt):
-        function = LoxFunction(stmt, self.environment)
+        function = LoxFunction(stmt, self.environment, False)
         self.environment.define(stmt.name.lexeme, function)
         return None
 

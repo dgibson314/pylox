@@ -7,6 +7,13 @@ from pylox_ast.stmt import StmtVisitor
 class FunctionType(Enum):
     NONE = auto()
     FUNCTION = auto()
+    INITIALIZER = auto()
+    METHOD = auto()
+
+
+class ClassType(Enum):
+    NONE = auto()
+    CLASS = auto()
 
 
 class Resolver(ExprVisitor, StmtVisitor):
@@ -17,6 +24,7 @@ class Resolver(ExprVisitor, StmtVisitor):
         # Keys are variable names, values are bools.
         self.scopes = []
         self.current_function = FunctionType.NONE
+        self.current_class = ClassType.NONE
 
     def resolve(self, x):
         match x:
@@ -69,74 +77,85 @@ class Resolver(ExprVisitor, StmtVisitor):
         self.begin_scope()
         self.resolve(block.statements)
         self.end_scope()
-        return None
+
+    def visit_class(self, stmt):
+        cached_ctype = self.current_class
+        self.current_class = ClassType.CLASS
+
+        self.declare(stmt.name)
+        self.define(stmt.name)
+
+        self.begin_scope()
+        self.scopes[-1]["this"] = True
+
+        for method in stmt.methods:
+            declaration = FunctionType.METHOD
+            if method.name.lexeme == "init":
+                declaration = FunctionType.INITIALIZER
+            self.resolve_function(method, declaration)
+
+        self.end_scope()
+        self.current_class = cached_ctype
 
     def visit_expression(self, stmt):
         self.resolve(stmt.expression)
-        return None
 
     def visit_function(self, stmt):
         self.declare(stmt.name)
         self.define(stmt.name)
 
         self.resolve_function(stmt, FunctionType.FUNCTION)
-        return None
 
     def visit_if(self, stmt):
         self.resolve(stmt.condition)
         self.resolve(stmt.then_branch)
         if stmt.else_branch:
             self.resolve(stmt.else_branch)
-        return None
 
     def visit_print(self, stmt):
         self.resolve(stmt.expression)
-        return None
 
     def visit_return(self, stmt):
         if self.current_function is FunctionType.NONE:
             self.runtime.error(stmt.keyword, "Can't return from top-level code.")
-        if stmt.value:
+        if stmt.value is not None:
+            if self.current_function is FunctionType.INITIALIZER:
+                self.runtime.error(stmt.keyword, "Can't return a value from an initializer")
             self.resolve(stmt.value)
-        return None
 
     def visit_var(self, var):
         self.declare(var.name)
         if var.initializer:
             self.resolve(var.initializer)
         self.define(var.name)
-        return None
 
     def visit_while(self, stmt):
         self.resolve(stmt.condition)
         self.resolve(stmt.body)
-        return None
 
     def visit_variable(self, expr):
         if self.scopes and (self.scopes[-1].get(expr.name.lexeme, None) is False):
             self.runtime.error(expr.name, "Can't read local variable in its own initializer")
         self.resolve_local(expr, expr.name)
-        return None
 
     def visit_assign(self, expr):
         self.resolve(expr.value)
         self.resolve_local(expr, expr.name)
-        return None
 
     def visit_binary(self, expr):
         self.resolve(expr.left)
         self.resolve(expr.right)
-        return None
 
     def visit_call(self, expr):
         self.resolve(expr.callee)
         for arg in expr.arguments:
             self.resolve(arg)
-        return None
+
+    def visit_get(self, expr):
+        self.resolve(expr.object_)
 
     def visit_grouping(self, expr):
         self.resolve(expr.expression)
-        return None
 
     def visit_literal(self, expr):
         return None
@@ -144,11 +163,17 @@ class Resolver(ExprVisitor, StmtVisitor):
     def visit_logical(self, expr):
         self.resolve(expr.left)
         self.resolve(expr.right)
-        return None
+
+    def visit_set(self, expr):
+        self.resolve(expr.value)
+        self.resolve(expr.object_)
+
+    def visit_this(self, expr):
+        if self.current_class is ClassType.NONE:
+            self.runtime.error(expr.keyword, "Can't use 'this' outside of a class.")
+            return None
+
+        self.resolve_local(expr, expr.keyword)
 
     def visit_unary(self, expr):
         self.resolve(expr.right)
-        return None
-
-
-

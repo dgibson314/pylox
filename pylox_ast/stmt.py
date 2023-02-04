@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 class StmtVisitor():
     def visit_block(expr): raise NotImplementedError
+    def visit_class(expr): raise NotImplementedError
     def visit_expression(expr): raise NotImplementedError
     def visit_function(expr): raise NotImplementedError
     def visit_if(expr): raise NotImplementedError
@@ -24,6 +25,15 @@ class Block(Stmt):
 
     def accept(self, visitor):
         return visitor.visit_block(self)
+
+
+class Class(Stmt):
+    def __init__(self, name, methods):
+        self.name = name
+        self.methods = methods
+
+    def accept(self, visitor):
+        return visitor.visit_class(self)
 
 
 class Expression(Stmt):

@@ -1,0 +1,15 @@
+class Test {
+  init() {
+    this.foo = "bar";
+  }
+  testPrint() {
+    print this.foo;
+  }
+}
+
+var test = Test();
+print test;
+
+test.field = 1;
+print test.field;
+test.testPrint();
