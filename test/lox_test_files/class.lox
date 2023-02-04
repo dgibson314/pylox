@@ -1,6 +1,9 @@
 class Test {
-  foo() {
-    return "bar";
+  init() {
+    this.foo = "bar";
+  }
+  testPrint() {
+    print this.foo;
   }
 }
 
@@ -9,4 +12,4 @@ print test;
 
 test.field = 1;
 print test.field;
-print test.foo();
+test.testPrint();

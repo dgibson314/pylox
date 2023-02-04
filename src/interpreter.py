@@ -142,7 +142,7 @@ class Interpreter(ExprVisitor, StmtVisitor):
 
         if len(arguments) != callee.arity():
             raise RuntimeException(expr.paren,
-                    f"Expected {function.arity()} arguments but got {len(arguments)}.")
+                    f"Expected {callee.arity()} arguments but got {len(arguments)}.")
 
         return callee(self, arguments)
 
@@ -184,7 +184,7 @@ class Interpreter(ExprVisitor, StmtVisitor):
 
         methods = {}
         for method in stmt.methods:
-            function = LoxFunction(method, self.environment)
+            function = LoxFunction(method, self.environment, method.name.lexeme=="init")
             methods[method.name.lexeme] = function
 
         klass = LoxClass(stmt.name.lexeme, methods)
@@ -196,7 +196,7 @@ class Interpreter(ExprVisitor, StmtVisitor):
         return None
 
     def visit_function(self, stmt):
-        function = LoxFunction(stmt, self.environment)
+        function = LoxFunction(stmt, self.environment, False)
         self.environment.define(stmt.name.lexeme, function)
         return None
 

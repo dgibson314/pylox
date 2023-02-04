@@ -7,6 +7,7 @@ from pylox_ast.stmt import StmtVisitor
 class FunctionType(Enum):
     NONE = auto()
     FUNCTION = auto()
+    INITIALIZER = auto()
     METHOD = auto()
 
 
@@ -76,7 +77,6 @@ class Resolver(ExprVisitor, StmtVisitor):
         self.begin_scope()
         self.resolve(block.statements)
         self.end_scope()
-        return None
 
     def visit_class(self, stmt):
         cached_ctype = self.current_class
@@ -90,6 +90,8 @@ class Resolver(ExprVisitor, StmtVisitor):
 
         for method in stmt.methods:
             declaration = FunctionType.METHOD
+            if method.name.lexeme == "init":
+                declaration = FunctionType.INITIALIZER
             self.resolve_function(method, declaration)
 
         self.end_scope()
@@ -97,32 +99,29 @@ class Resolver(ExprVisitor, StmtVisitor):
 
     def visit_expression(self, stmt):
         self.resolve(stmt.expression)
-        return None
 
     def visit_function(self, stmt):
         self.declare(stmt.name)
         self.define(stmt.name)
 
         self.resolve_function(stmt, FunctionType.FUNCTION)
-        return None
 
     def visit_if(self, stmt):
         self.resolve(stmt.condition)
         self.resolve(stmt.then_branch)
         if stmt.else_branch:
             self.resolve(stmt.else_branch)
-        return None
 
     def visit_print(self, stmt):
         self.resolve(stmt.expression)
-        return None
 
     def visit_return(self, stmt):
         if self.current_function is FunctionType.NONE:
             self.runtime.error(stmt.keyword, "Can't return from top-level code.")
-        if stmt.value:
+        if stmt.value is not None:
+            if self.current_function is FunctionType.INITIALIZER:
+                self.runtime.error(stmt.keyword, "Can't return a value from an initializer")
             self.resolve(stmt.value)
-        return None
 
     def visit_var(self, var):
         self.declare(var.name)

@@ -11,10 +11,21 @@ class LoxClass(LoxCallable):
         return self.name
 
     def __call__(self, interpreter, arguments):
-        return LoxInstance(self)
+        instance = LoxInstance(self)
+
+        # Look for an "init" method. If we find one, immediately bind
+        # and invoke it just like a normal method call
+        initializer = self.find_method("init")
+        if initializer:
+            initializer.bind(instance)(interpreter, arguments)
+
+        return instance
 
     def arity(self):
-        return 0
+        initializer = self.find_method("init")
+        if initializer is None:
+            return 0
+        return initializer.arity()
 
     def find_method(self, name):
         return self.methods.get(name, None)
