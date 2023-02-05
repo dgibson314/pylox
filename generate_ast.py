@@ -11,6 +11,7 @@ expr_types = {
     "Literal" : ["value"],
     "Logical" : ["left", "operator", "right"],
     "Set"     : ["object_", "name", "value"],
+    "Super"   : ["keyword", "method"],
     "This"    : ["keyword"],
     "Unary"   : ["operator", "right"],
     "Variable": ["name"],
@@ -18,7 +19,7 @@ expr_types = {
 
 stmt_types = {
     "Block"      : ["statements"],
-    "Class"      : ["name", "methods"],
+    "Class"      : ["name", "superclass", "methods"],
     "Expression" : ["expression"],
     "Function"   : ["name", "params", "body"],
     "If"         : ["condition", "then_branch", "else_branch"],

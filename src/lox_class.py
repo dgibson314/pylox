@@ -3,8 +3,9 @@ from src.lox_callable import LoxCallable
 
 
 class LoxClass(LoxCallable):
-    def __init__(self, name, methods):
+    def __init__(self, name, superclass, methods):
         self.name = name
+        self.superclass = superclass
         self.methods = methods
 
     def __str__(self):
@@ -28,7 +29,13 @@ class LoxClass(LoxCallable):
         return initializer.arity()
 
     def find_method(self, name):
-        return self.methods.get(name, None)
+        if name in self.methods:
+            return self.methods[name]
+
+        if self.superclass:
+            return self.superclass.find_method(name)
+
+        return None
 
 
 class LoxInstance():

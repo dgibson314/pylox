@@ -66,6 +66,19 @@ class Interpreter(ExprVisitor, StmtVisitor):
         lox_object.set(expr.name, value)
         return value
 
+    def visit_super(self, expr):
+        distance = self.locals[expr]
+        superclass = self.environment.get_at(distance, "super")
+
+        _object = self.environment.get_at(distance - 1, "this")
+
+        method = superclass.find_method(expr.method.lexeme)
+        
+        if method == None:
+            raise RuntimeException(expr.method, f"Undefined property '{expr.method.lexeme}'.")
+
+        return method.bind(_object)
+
     def visit_this(self, expr):
         return self.lookup_variable(expr.keyword, expr)
 
@@ -180,14 +193,32 @@ class Interpreter(ExprVisitor, StmtVisitor):
         return None
 
     def visit_class(self, stmt):
+        superclass = None
+        if stmt.superclass:
+            superclass = self.evaluate(stmt.superclass)
+            if not isinstance(superclass, LoxClass):
+                raise RuntimeException(stmt.superclass.name, "Superclass must be a class")
+
         self.environment.define(stmt.name.lexeme, None)
+
+        # When we evaluate a sublclass definition, we create a new environment. Inside, we
+        # store a references to the superclass. Then we create the LoxFunctions for each method.
+        # Those will capture the current environment - the one where we just bound "super" - as
+        # closure, holding on to the reference to the superclass
+        if stmt.superclass:
+            self.environment = Environment(enclosing=self.environment)
+            self.environment.define("super", superclass)
 
         methods = {}
         for method in stmt.methods:
             function = LoxFunction(method, self.environment, method.name.lexeme=="init")
             methods[method.name.lexeme] = function
 
-        klass = LoxClass(stmt.name.lexeme, methods)
+        # Now that we're done creating the methods we can pop back to the initial environment
+        if superclass:
+            self.environment = self.environment.enclosing
+
+        klass = LoxClass(stmt.name.lexeme, superclass, methods)
         self.environment.assign(stmt.name, klass)
         return None
 

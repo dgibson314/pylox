@@ -27,7 +27,7 @@ class Parser():
     ------------------
     program        → declaration* EOF
     declaration    → classDecl | funDecl | varDecl | statement
-    classDecl      → "class" IDENTIFIER "{" function* "}"
+    classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}"
     funDecl        → "fun" function
     function       → IDENTIFIER "(" parameters? ")" block
     parameters     → IDENTIFIER ( "," IDENTIFIER )*
@@ -53,8 +53,8 @@ class Parser():
     unary          → ( "!" | "-" ) unary | call
     call           → primary ( "(" arguments? ")" | "." IDENTIFIER )*
     arguments      → expression ( "," expression )*
-    primary        → NUMBER | STRING | "true" | "false" | "nil"
-                   | "(" expression ")" | IDENTIFIER
+    primary        → NUMBER | STRING | "true" | "false" | "nil" | "this"
+                   | "(" expression ")" | | "super" "." IDENTIFIER | IDENTIFIER
     """
     def __init__(self, runtime, tokens):
         self.runtime = runtime
@@ -87,7 +87,16 @@ class Parser():
             return None
 
     def class_declaration(self):
+        """
+        classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}"
+        """
         name = self.consume(TT.IDENTIFIER, "Expect class name.")
+
+        superclass = None
+        if self.match_types(TT.LESS):
+            self.consume(TT.IDENTIFIER, "Expect superclass name.")
+            superclass = Expr.Variable(self.previous())
+
         self.consume(TT.LEFT_BRACE, "Expect '{' before class body.")
 
         methods = []
@@ -96,7 +105,7 @@ class Parser():
 
         self.consume(TT.RIGHT_BRACE, "Expect '}' after class body.")
         
-        return Stmt.Class(name, methods)
+        return Stmt.Class(name, superclass, methods)
 
     def statement(self):
         """
@@ -393,6 +402,12 @@ class Parser():
 
         if self.match_types(TT.NUMBER, TT.STRING):
             return Expr.Literal(self.previous().literal)
+
+        if self.match_types(TT.SUPER):
+            keyword = self.previous()
+            self.consume(TT.DOT, "Expect '.' after 'super'.")
+            method = self.consume(TT.IDENTIFIER, "Expect superclass method name.")
+            return Expr.Super(keyword, method)
 
         if self.match_types(TT.THIS):
             return Expr.This(self.previous())

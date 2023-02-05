@@ -10,6 +10,7 @@ class ExprVisitor():
     def visit_literal(expr): raise NotImplementedError
     def visit_logical(expr): raise NotImplementedError
     def visit_set(expr): raise NotImplementedError
+    def visit_super(expr): raise NotImplementedError
     def visit_this(expr): raise NotImplementedError
     def visit_unary(expr): raise NotImplementedError
     def visit_variable(expr): raise NotImplementedError
@@ -93,6 +94,15 @@ class Set(Expr):
 
     def accept(self, visitor):
         return visitor.visit_set(self)
+
+
+class Super(Expr):
+    def __init__(self, keyword, method):
+        self.keyword = keyword
+        self.method = method
+
+    def accept(self, visitor):
+        return visitor.visit_super(self)
 
 
 class This(Expr):
