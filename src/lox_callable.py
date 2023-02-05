@@ -20,7 +20,7 @@ class ClockCallable(LoxCallable):
         return 0
     def __call__(self, interpreter, arguments):
         # Returns current time in seconds
-        return round(time.time() * 1000)
+        return float(round(time.time() * 1000))
     def __str__(self):
         return "<native fn>"
 
