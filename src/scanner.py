@@ -19,7 +19,7 @@ class Scanner():
         self.current += 1
         return char
 
-    def add_token(token_type, literal):
+    def add_token(token_type, literal=None):
         text = self.source[self.start : self.current]
         self.tokens.append(Token(type, text, literal, self.line))
 
@@ -36,5 +36,11 @@ class Scanner():
         match c:
             case '(': self.add_token(TT.LEFT_PAREN)
             case ')': self.add_token(TT.RIGHT_PAREN)
-            case _: print("Unrecognized case")
-
+            case '{': self.add_token(TT.LEFT_BRACE)
+            case '}': self.add_token(TT.RIGHT_BRACE)
+            case ',': self.add_token(TT.COMMA)
+            case '.': self.add_token(TT.DOT)
+            case '-': self.add_token(TT.MINUS)
+            case '+': self.add_token(TT.PLUS)
+            case ';': self.add_token(TT.SEMICOLON)
+            case '*': self.add_token(TT.STAR)
