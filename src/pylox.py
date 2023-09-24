@@ -3,16 +3,8 @@ import sys
 from scanner import Scanner
 
 class PyLox():
-    def __init__(self, args):
+    def __init__(self):
         self.had_error = False
-
-        if len(args) > 1:
-            print("Usage: pylox [script]")
-            sys.exit(64)
-        elif len(args) == 1:
-            self.run_file(args[0])
-        else:
-            self.run_prompt()
 
     def run_file(self, path):
         with open(path, "r") as f:
@@ -42,13 +34,8 @@ class PyLox():
         self.had_error = True
 
     def run(self, source):
-        scanner = Scanner(source)
+        scanner = Scanner(source, self)
         tokens = scanner.scan_tokens()
 
         for token in tokens:
             print(token)
-
-
-
-if __name__ == "__main__":
-    pylox = PyLox(sys.argv)
