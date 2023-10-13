@@ -1,6 +1,5 @@
 from tokens import Token
-from tokentype import TokenType as TT
-
+from tokens import TokenType as TT
 
 class Scanner():
     keywords = {
@@ -10,9 +9,8 @@ class Scanner():
         "true": TT.TRUE, "var": TT.VAR, "while": TT.WHILE
     }
 
-    def __init__(self, source, runtime):
+    def __init__(self, source):
         self.source = source
-        self.runtime = runtime
         self.tokens = []
 
         self.start = 0
@@ -30,6 +28,9 @@ class Scanner():
     def add_token(self, token_type, literal=None):
         text = self.source[self.start : self.current]
         self.tokens.append(Token(token_type, text, literal, self.line))
+
+    def error_token(self, message):
+        self.tokens.append(Token(TT.ERROR, message, None, self.line))
 
     def scan_tokens(self):
         while not self.is_at_end():
@@ -110,7 +111,7 @@ class Scanner():
                 elif self.is_alpha(c):
                     self.identifier()
                 else:
-                    self.runtime.error(self.line, "Unexpected character.")
+                    self.error_token("Unexpected character.")
 
     def identifier(self):
         while self.is_alphanumeric(self.peek()):
@@ -145,7 +146,7 @@ class Scanner():
             self.advance()
 
         if self.is_at_end():
-            self.runtime.error(self.line, "Unterminated string.")
+            self.error_token("Unterminated string.")
             return
 
         # The closing "

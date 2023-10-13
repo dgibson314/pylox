@@ -17,11 +17,10 @@ BIN_OPS = {
 class VM():
     def __init__(self, chunk):
         self.chunk = chunk
-        self.ip = None
+        self.ip = 0
         self.stack = []
 
-    def interpret(self):
-        self.ip = 0
+    def interpret(self, chunk):
         return self.run()
 
     def read_op(self):
