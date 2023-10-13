@@ -1,5 +1,6 @@
 from collections import namedtuple
 from enum import Enum
+import pdb
 
 from chunk import Chunk
 from chunk import OpCode as OP
@@ -33,24 +34,27 @@ class PrattParser():
         self.chunk = Chunk()
 
         self.parse_rules = {
-            TT.LEFT_PAREN:  ParseRule(self.grouping, None, PREC_NONE),
-            TT.RIGHT_PAREN: ParseRule(None, None, PREC_NONE),
-            TT.LEFT_BRACE:  ParseRule(None, None, PREC_NONE),
-            TT.RIGHT_BRACE: ParseRule(None, None, PREC_NONE),
-            TT.COMMA:       ParseRule(None, None, PREC_NONE),
-            TT.DOT:         ParseRule(None, None, PREC_NONE),
-            TT.MINUS:       ParseRule(self.unary, self.binary, PREC_TERM),
-            TT.PLUS:        ParseRule(None, self.binary, PREC_TERM),
-            TT.SEMICOLON:   ParseRule(None, None, PREC_NONE),
-            TT.SLASH:       ParseRule(None, self.binary, PREC_FACTOR),
-            TT.STAR:        ParseRule(None, self.binary, PREC_FACTOR),
-            TT.BANG:        ParseRule(None, None, PREC_NONE),
-            TT.BANG_EQUAL:  ParseRule(None, None, PREC_NONE),
-            TT.EQUAL:       ParseRule(None, None, PREC_NONE),
-            TT.EQUAL_EQUAL: ParseRule(None, None, PREC_NONE),
-            TT.NUMBER:      ParseRule(self.number, None, PREC_NONE),
-            TT.RETURN:      ParseRule(None, None, PREC_NONE),
-            TT.EOF:         ParseRule(None, None, PREC_NONE),
+            TT.LEFT_PAREN:      ParseRule(self.grouping, None, PREC_NONE),
+            TT.RIGHT_PAREN:     ParseRule(None, None, PREC_NONE),
+            TT.LEFT_BRACE:      ParseRule(None, None, PREC_NONE),
+            TT.RIGHT_BRACE:     ParseRule(None, None, PREC_NONE),
+            TT.COMMA:           ParseRule(None, None, PREC_NONE),
+            TT.DOT:             ParseRule(None, None, PREC_NONE),
+            TT.MINUS:           ParseRule(self.unary, self.binary, PREC_TERM),
+            TT.PLUS:            ParseRule(None, self.binary, PREC_TERM),
+            TT.SEMICOLON:       ParseRule(None, None, PREC_NONE),
+            TT.SLASH:           ParseRule(None, self.binary, PREC_FACTOR),
+            TT.STAR:            ParseRule(None, self.binary, PREC_FACTOR),
+            TT.BANG:            ParseRule(None, None, PREC_NONE),
+            TT.BANG_EQUAL:      ParseRule(None, None, PREC_NONE),
+            TT.EQUAL:           ParseRule(None, None, PREC_NONE),
+            TT.EQUAL_EQUAL:     ParseRule(None, None, PREC_NONE),
+            TT.GREATER:         ParseRule(None, None, PREC_NONE),
+            TT.GREATER_EQUAL:   ParseRule(None, None, PREC_NONE),
+            TT.LESS:            ParseRule(None, None, PREC_NONE),
+            TT.NUMBER:          ParseRule(self.number, None, PREC_NONE),
+            TT.RETURN:          ParseRule(None, None, PREC_NONE),
+            TT.EOF:             ParseRule(None, None, PREC_NONE),
         }
 
     def compile(self):
