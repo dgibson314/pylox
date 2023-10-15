@@ -2,6 +2,11 @@ from enum import Enum
 
 OpCode = Enum("OpCode", [
     "CONSTANT",
+    "ADD",
+    "SUBTRACT",
+    "MULTIPLY",
+    "DIVIDE",
+    "NEGATE",
     "RETURN",
 ])
 
@@ -38,13 +43,14 @@ class Chunk():
         match op:
             case OpCode.CONSTANT:
                 return self.constant_instruction(op, offset)
-            case OpCode.RETURN:
+            case OpCode.NEGATE | OpCode.RETURN | OpCode.ADD | \
+                 OpCode.SUBTRACT | OpCode.MULTIPLY | OpCode.DIVIDE:
                 return self.simple_instruction(op, offset)
             case _:
                 print(f"Unknown opcode {op}")
                 return offset + 1
 
-    def disassemble(self, name):
+    def disassemble(self, name="test"):
         print(f"== {name} ==")
 
         offset = 0

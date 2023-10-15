@@ -1,6 +1,8 @@
 import sys
 
+from compiler import PrattParser
 from scanner import Scanner
+from vm import VM
 
 class PyLox():
     def __init__(self):
@@ -34,11 +36,14 @@ class PyLox():
         self.had_error = True
 
     def run(self, source):
-        scanner = Scanner(source, self)
+        scanner = Scanner(source)
         tokens = scanner.scan_tokens()
 
-        for token in tokens:
-            print(token)
+        compiler = PrattParser(tokens)
+        chunk = compiler.compile()
+
+        vm = VM(chunk)
+        return vm.interpret(chunk)
 
 
 if __name__ == "__main__":
