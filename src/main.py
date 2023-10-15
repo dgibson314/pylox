@@ -1,7 +1,7 @@
 import sys
 
-from chunk import Chunk
-from chunk import OpCode as OP
+from lox_chunk import Chunk
+from lox_chunk import OpCode as OP
 from vm import VM
 
 if __name__ == "__main__":

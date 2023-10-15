@@ -1,7 +1,7 @@
 from enum import Enum
 import operator
 
-from chunk import OpCode as OP
+from lox_chunk import OpCode as OP
 
 InterpretResult = Enum("InterpretResult", [
     "INTERPRET_OK", "INTERPRET_COMPILE_ERROR", "INTERPRET_RUNTIME_ERROR"
@@ -46,6 +46,9 @@ class VM():
         self.push(c)
 
     def run(self):
+        """
+        Returns tuple of (InterpretResult, result)
+        """
         while True:
             instruction = self.read_op()
             match instruction:
@@ -63,8 +66,7 @@ class VM():
                 case OP.NEGATE:
                     self.push(-self.pop())
                 case OP.RETURN:
-                    print(self.pop())
-                    return InterpretResult.INTERPRET_OK
+                    return (InterpretResult.INTERPRET_OK, self.pop())
                 case _:
                     print("Unknown opcode {instruction}")
-                    return InterpretResult.INTERPRET_RUNTIME_ERROR
+                    return (InterpretResult.INTERPRET_RUNTIME_ERROR, None)

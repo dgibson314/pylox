@@ -2,8 +2,8 @@ from collections import namedtuple
 from enum import Enum
 import pdb
 
-from chunk import Chunk
-from chunk import OpCode as OP
+from lox_chunk import Chunk
+from lox_chunk import OpCode as OP
 from tokens import TokenType as TT
 
 PREC_NONE = 0
