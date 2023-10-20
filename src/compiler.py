@@ -54,6 +54,7 @@ class PrattParser():
             TT.LESS:            ParseRule(None, self.binary, PREC_COMPARISON),
             TT.LESS_EQUAL:      ParseRule(None, self.binary, PREC_COMPARISON),
             TT.IDENTIFIER:      ParseRule(None, None, PREC_NONE),
+            TT.STRING:          ParseRule(self.string, None, PREC_NONE),
             TT.ELSE:            ParseRule(None, None, PREC_NONE),
             TT.FALSE:           ParseRule(self.literal, None, PREC_NONE),
             TT.FOR:             ParseRule(None, None, PREC_NONE),
@@ -175,6 +176,9 @@ class PrattParser():
         # Number tokens store the number as a `float` in the `literal` field
         value = Value(self.previous.literal)
         self.emit_constant(value)
+
+    def string(self):
+        self.emit_constant(Value(self.previous.literal))
 
     def unary(self):
         tt_type = self.previous._type

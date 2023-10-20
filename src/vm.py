@@ -51,6 +51,12 @@ class VM():
         index = -1 - distance
         return self.stack[index]
 
+    def concatenate(self):
+        b = self.pop().value
+        a = self.pop().value
+        c = Value(a + b)
+        self.push(c)
+
     def _binary_op(self, op_char):
         if self.peek(0).is_number() and self.peek(1).is_number():
             op = BIN_OPS[op_char]
@@ -87,7 +93,13 @@ class VM():
                 case OP.LESS:
                     self._binary_op("<")
                 case OP.ADD:
-                    self._binary_op("+")
+                    if self.peek(0).is_string() and self.peek(1).is_string():
+                        self.concatenate()
+                    elif self.peek(0).is_number() and self.peek(1).is_number():
+                        self._binary_op("+")
+                    else:
+                        self.runtime_error("Operands must be two numbers or two string")
+                        return (InterpretResult.INTERPRET_RUNTIME_ERROR, None)
                 case OP.SUBTRACT:
                     self._binary_op("-")
                 case OP.MULTIPLY:
