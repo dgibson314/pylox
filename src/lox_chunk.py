@@ -2,10 +2,17 @@ from enum import Enum
 
 OpCode = Enum("OpCode", [
     "CONSTANT",
+    "NIL",
+    "TRUE",
+    "FALSE",
+    "EQUAL",
+    "GREATER",
+    "LESS",
     "ADD",
     "SUBTRACT",
     "MULTIPLY",
     "DIVIDE",
+    "NOT",
     "NEGATE",
     "RETURN",
 ])
@@ -33,7 +40,7 @@ class Chunk():
         constant = self.code[offset + 1]
         value = self.constants[constant]
         print(f"{op.name} {constant} ", end="")
-        print(value)
+        print(value.value)
         return offset + 2
 
     def disassemble_instruction(self, offset):
@@ -43,8 +50,20 @@ class Chunk():
         match op:
             case OpCode.CONSTANT:
                 return self.constant_instruction(op, offset)
-            case OpCode.NEGATE | OpCode.RETURN | OpCode.ADD | \
-                 OpCode.SUBTRACT | OpCode.MULTIPLY | OpCode.DIVIDE:
+            case OpCode.NEGATE \
+               | OpCode.RETURN \
+               | OpCode.FALSE \
+               | OpCode.ADD \
+               | OpCode.EQUAL \
+               | OpCode.GREATER \
+               | OpCode.LESS \
+               | OpCode.SUBTRACT \
+               | OpCode.MULTIPLY \
+               | OpCode.DIVIDE \
+               | OpCode.NIL \
+               | OpCode.TRUE \
+               | OpCode.DIVIDE \
+               | OpCode.NOT:
                 return self.simple_instruction(op, offset)
             case _:
                 print(f"Unknown opcode {op}")

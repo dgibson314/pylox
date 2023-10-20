@@ -1,9 +1,9 @@
 from collections import namedtuple
 from enum import Enum
-import pdb
 
 from lox_chunk import Chunk
 from lox_chunk import OpCode as OP
+from lox_value import Value
 from tokens import TokenType as TT
 
 PREC_NONE = 0
@@ -45,15 +45,26 @@ class PrattParser():
             TT.SEMICOLON:       ParseRule(None, None, PREC_NONE),
             TT.SLASH:           ParseRule(None, self.binary, PREC_FACTOR),
             TT.STAR:            ParseRule(None, self.binary, PREC_FACTOR),
-            TT.BANG:            ParseRule(None, None, PREC_NONE),
-            TT.BANG_EQUAL:      ParseRule(None, None, PREC_NONE),
+            TT.BANG:            ParseRule(self.unary, None, PREC_NONE),
+            TT.BANG_EQUAL:      ParseRule(None, self.binary, PREC_EQUALITY),
             TT.EQUAL:           ParseRule(None, None, PREC_NONE),
-            TT.EQUAL_EQUAL:     ParseRule(None, None, PREC_NONE),
-            TT.GREATER:         ParseRule(None, None, PREC_NONE),
-            TT.GREATER_EQUAL:   ParseRule(None, None, PREC_NONE),
-            TT.LESS:            ParseRule(None, None, PREC_NONE),
+            TT.EQUAL_EQUAL:     ParseRule(None, self.binary, PREC_EQUALITY),
+            TT.GREATER:         ParseRule(None, self.binary, PREC_COMPARISON),
+            TT.GREATER_EQUAL:   ParseRule(None, self.binary, PREC_COMPARISON),
+            TT.LESS:            ParseRule(None, self.binary, PREC_COMPARISON),
+            TT.LESS_EQUAL:      ParseRule(None, self.binary, PREC_COMPARISON),
+            TT.IDENTIFIER:      ParseRule(None, None, PREC_NONE),
+            TT.ELSE:            ParseRule(None, None, PREC_NONE),
+            TT.FALSE:           ParseRule(self.literal, None, PREC_NONE),
+            TT.FOR:             ParseRule(None, None, PREC_NONE),
+            TT.IF:              ParseRule(None, None, PREC_NONE),
+            TT.NIL:             ParseRule(self.literal, None, PREC_NONE),
+            TT.OR:              ParseRule(None, None, PREC_NONE),
             TT.NUMBER:          ParseRule(self.number, None, PREC_NONE),
             TT.RETURN:          ParseRule(None, None, PREC_NONE),
+            TT.THIS:            ParseRule(None, None, PREC_NONE),
+            TT.TRUE:            ParseRule(self.literal, None, PREC_NONE),
+            TT.VAR:             ParseRule(None, None, PREC_NONE),
             TT.EOF:             ParseRule(None, None, PREC_NONE),
         }
 
@@ -65,6 +76,8 @@ class PrattParser():
         return self.chunk
 
     def advance(self):
+        if self.current and self.current._type == TT.EOF:
+            return self.error("Unexpected EOF")
         self.previous = self.current
         self.index += 1
         self.current = self.tokens[self.index]
@@ -93,7 +106,7 @@ class PrattParser():
             return
         self.panic_mode = True
 
-        print(f"[line {token.line} Error", end="")
+        print(f"[line {token.line}] Error", end="")
 
         if token._type == TT.EOF:
             print(" at end", end="")
@@ -130,12 +143,26 @@ class PrattParser():
         self.parse_precedence(rule.precedence + 1)
 
         match tt_type:
-            case TT.PLUS:   self.emit_byte(OP.ADD)
-            case TT.MINUS:  self.emit_byte(OP.SUBTRACT)
-            case TT.STAR:   self.emit_byte(OP.MULTIPLY)
-            case TT.SLASH:  self.emit_byte(OP.DIVIDE)
+            case TT.BANG_EQUAL:    self.emit_bytes(OP.EQUAL, OP.NOT)
+            case TT.EQUAL_EQUAL:   self.emit_byte(OP.EQUAL)
+            case TT.GREATER:       self.emit_byte(OP.GREATER)
+            case TT.GREATER_EQUAL: self.emit_bytes(OP.LESS, OP.NOT)
+            case TT.LESS:          self.emit_byte(OP.LESS)
+            case TT.LESS_EQUAL:    self.emit_bytes(OP.GREATER, OP.NOT)
+            case TT.PLUS:          self.emit_byte(OP.ADD)
+            case TT.MINUS:         self.emit_byte(OP.SUBTRACT)
+            case TT.STAR:          self.emit_byte(OP.MULTIPLY)
+            case TT.SLASH:         self.emit_byte(OP.DIVIDE)
             case _:
                 raise Exception("Unreachable binary operator type")
+
+    def literal(self):
+        match self.previous._type:
+            case TT.FALSE: self.emit_byte(OP.FALSE)
+            case TT.NIL:   self.emit_byte(OP.NIL)
+            case TT.TRUE:  self.emit_byte(OP.TRUE)
+            case _:
+                raise Exception("Unreachable literal token type")
 
     def grouping(self):
         self.expression()
@@ -146,7 +173,7 @@ class PrattParser():
 
     def number(self):
         # Number tokens store the number as a `float` in the `literal` field
-        value = self.previous.literal
+        value = Value(self.previous.literal)
         self.emit_constant(value)
 
     def unary(self):
@@ -157,6 +184,7 @@ class PrattParser():
 
         # Emit the operator instruction
         match tt_type: 
+            case TT.BANG: self.emit_byte(OP.NOT)
             case TT.MINUS: self.emit_byte(OP.NEGATE)
             case _:
                 # Unreachable

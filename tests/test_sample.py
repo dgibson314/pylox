@@ -1,5 +1,6 @@
 import json
 import os
+import pytest
 import sys
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +18,7 @@ def run_program(prog_string):
 def test_add():
     status, answer = run_program("1 + 2")
     assert status == InterpretResult.INTERPRET_OK
-    assert answer == 3.0
+    assert answer.value == 3.0
 
 def test_passing():
     with open("programs.json", "r") as f:
@@ -26,4 +27,4 @@ def test_passing():
             status, answer = run_program(entry[0])
 
             assert status == InterpretResult.INTERPRET_OK
-            assert answer == entry[1]
+            assert str(answer) == entry[1]

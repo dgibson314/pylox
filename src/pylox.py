@@ -2,7 +2,7 @@ import sys
 
 from compiler import PrattParser
 from scanner import Scanner
-from vm import VM
+from vm import VM, InterpretResult
 
 class PyLox():
     def __init__(self):
@@ -39,11 +39,20 @@ class PyLox():
         scanner = Scanner(source)
         tokens = scanner.scan_tokens()
 
+        #for token in tokens:
+            #print(token)
+
         compiler = PrattParser(tokens)
         chunk = compiler.compile()
 
+        if compiler.had_error:
+            return None
+
         vm = VM(chunk)
-        return vm.interpret(chunk)
+        status, result = vm.interpret(chunk)
+        if status == InterpretResult.INTERPRET_OK:
+            print(result)
+        return (status, result)
 
 
 if __name__ == "__main__":
