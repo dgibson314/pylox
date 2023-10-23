@@ -1,5 +1,6 @@
 from collections import namedtuple
 from enum import Enum
+import pdb
 
 from lox_chunk import Chunk
 from lox_chunk import OpCode as OP
@@ -53,7 +54,7 @@ class PrattParser():
             TT.GREATER_EQUAL:   ParseRule(None, self.binary, PREC_COMPARISON),
             TT.LESS:            ParseRule(None, self.binary, PREC_COMPARISON),
             TT.LESS_EQUAL:      ParseRule(None, self.binary, PREC_COMPARISON),
-            TT.IDENTIFIER:      ParseRule(None, None, PREC_NONE),
+            TT.IDENTIFIER:      ParseRule(self.variable, None, PREC_NONE),
             TT.STRING:          ParseRule(self.string, None, PREC_NONE),
             TT.ELSE:            ParseRule(None, None, PREC_NONE),
             TT.FALSE:           ParseRule(self.literal, None, PREC_NONE),
@@ -71,8 +72,10 @@ class PrattParser():
 
     def compile(self):
         self.advance()
-        self.expression()
-        self.match(TT.EOF, "Expect end of expression.")
+
+        while not self.match(TT.EOF):
+            self.declaration()
+
         self.end_compiler()
         return self.chunk
 
@@ -85,9 +88,13 @@ class PrattParser():
         if self.current == TT.ERROR:
             self.error_at_current(self.current.lexeme)
 
-    def match(self, token_type, message):
+    def match(self, token_type):
         if self.current._type != token_type:
-            self.error_at_current(message)
+            return False
+        if self.current._type == TT.EOF:
+            return True
+        self.advance()
+        return True
 
     def consume(self, token_type, message):
         if self.current._type == token_type:
@@ -172,6 +179,66 @@ class PrattParser():
     def expression(self):
         self.parse_precedence(PREC_ASSIGNMENT)
 
+    def define_variable(self, global_idx):
+        self.emit_bytes(OP.DEFINE_GLOBAL, global_idx)
+
+    def var_declaration(self):
+        global_idx = self.parse_variable("Expect variable name.")
+
+        if self.match(TT.EQUAL):
+            self.expression()
+        else:
+            self.emit_byte(OP.NIL)
+
+        self.consume(TT.SEMICOLON, "Expect ';' after variable declaration.")
+
+        self.define_variable(global_idx)
+
+    def expression_statement(self):
+        self.expression()
+        self.consume(TT.SEMICOLON, "Expect ';' after expression.")
+        self.emit_byte(OP.POP)
+
+    def print_statement(self):
+        self.expression()
+        self.consume(TT.SEMICOLON, "Expect ';' after value.")
+        self.emit_byte(OP.PRINT)
+
+    def synchronize(self):
+        self.panic_mode = False
+
+        # Skip tokens until we reach something that looks like a statement boundary
+        while self.current._type != TT.EOF:
+            if self.previous._type == TT.SEMICOLON:
+                return
+            match self.current._type:
+                case TT.CLASS \
+                   | TT.FUN \
+                   | TT.VAR \
+                   | TT.FOR \
+                   | TT.IF \
+                   | TT.WHILE \
+                   | TT.PRINT \
+                   | TT.RETURN:
+                    return
+                case _: pass
+            self.advance()
+
+    def declaration(self):
+        if self.match(TT.VAR):
+            self.var_declaration()
+        else:
+            self.statement()
+
+        if self.panic_mode:
+            self.synchronize()
+
+    def statement(self):
+        if self.match(TT.PRINT):
+            self.print_statement()
+        else:
+            self.expression_statement()
+
     def number(self):
         # Number tokens store the number as a `float` in the `literal` field
         value = Value(self.previous.literal)
@@ -179,6 +246,18 @@ class PrattParser():
 
     def string(self):
         self.emit_constant(Value(self.previous.literal))
+
+    def variable(self, can_assign):
+        self.named_variable(self.previous, can_assign)
+
+    def named_variable(self, tok_name, can_assign):
+        arg_idx = self.identifier_constant(tok_name)
+
+        if can_assign and self.match(TT.EQUAL):
+            self.expression()
+            self.emit_bytes(OP.SET_GLOBAL, arg_idx)
+        else:
+            self.emit_bytes(OP.GET_GLOBAL, arg_idx)
 
     def unary(self):
         tt_type = self.previous._type
@@ -200,9 +279,27 @@ class PrattParser():
         if prefix_rule == None:
             self.error("Expect expression.")
             return
-        prefix_rule()
+
+        can_assign = precedence <= PREC_ASSIGNMENT
+
+        if prefix_rule == self.variable:
+            prefix_rule(can_assign)
+        else:
+            prefix_rule()
 
         while (precedence <= self.parse_rules[self.current._type].precedence):
             self.advance()
             infix_rule = self.parse_rules[self.previous._type].infix
             infix_rule()
+
+        if can_assign and self.match(TT.EQUAL):
+            self.error("Invalid assignment target.")
+
+    def identifier_constant(self, tok_name):
+        value = Value(tok_name.lexeme)
+        constant_index = self.chunk.add_constant(value)
+        return constant_index
+
+    def parse_variable(self, message):
+        self.consume(TT.IDENTIFIER, message)
+        return self.identifier_constant(self.previous)

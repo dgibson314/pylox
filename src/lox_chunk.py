@@ -1,4 +1,5 @@
 from enum import Enum
+from lox_value import Value
 
 OpCode = Enum("OpCode", [
     "CONSTANT",
@@ -6,6 +7,10 @@ OpCode = Enum("OpCode", [
     "TRUE",
     "FALSE",
     "EQUAL",
+    "POP",
+    "GET_GLOBAL",
+    "SET_GLOBAL",
+    "DEFINE_GLOBAL",
     "GREATER",
     "LESS",
     "ADD",
@@ -14,6 +19,7 @@ OpCode = Enum("OpCode", [
     "DIVIDE",
     "NOT",
     "NEGATE",
+    "PRINT",
     "RETURN",
 ])
 
@@ -48,11 +54,15 @@ class Chunk():
 
         op = self.code[offset]
         match op:
-            case OpCode.CONSTANT:
+            case OpCode.CONSTANT \
+               | OpCode.GET_GLOBAL \
+               | OpCode.SET_GLOBAL \
+               | OpCode.DEFINE_GLOBAL :
                 return self.constant_instruction(op, offset)
             case OpCode.NEGATE \
                | OpCode.RETURN \
                | OpCode.FALSE \
+               | OpCode.POP \
                | OpCode.ADD \
                | OpCode.EQUAL \
                | OpCode.GREATER \
@@ -63,6 +73,7 @@ class Chunk():
                | OpCode.NIL \
                | OpCode.TRUE \
                | OpCode.DIVIDE \
+               | OpCode.PRINT \
                | OpCode.NOT:
                 return self.simple_instruction(op, offset)
             case _:
@@ -75,3 +86,10 @@ class Chunk():
         offset = 0
         while (offset < len(self.code)):
             offset = self.disassemble_instruction(offset)
+
+    def debug_constants(self):
+        for constant in self.constants:
+            if not isinstance(constant, Value):
+                raise Exception("Not a Value")
+            print(constant)
+

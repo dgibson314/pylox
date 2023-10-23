@@ -16,15 +16,15 @@ def run_program(prog_string):
     return PyLox().run(prog_string)
 
 def test_add():
-    status, answer = run_program("1 + 2")
+    status = run_program("print 1 + 2;")
     assert status == InterpretResult.INTERPRET_OK
-    assert answer.value == 3.0
 
-def test_passing():
+def test_passing(capsys):
     with open("programs.json", "r") as f:
         progs = json.loads(f.read())
         for entry in progs["Passing"]:
-            status, answer = run_program(entry[0])
+            status = run_program(entry[0])
+            captured = capsys.readouterr()
 
             assert status == InterpretResult.INTERPRET_OK
-            assert str(answer) == entry[1]
+            assert captured.out == entry[1]

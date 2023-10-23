@@ -1,5 +1,6 @@
 from enum import Enum
 import operator
+import pdb
 
 from lox_chunk import OpCode as OP
 from lox_value import Value
@@ -18,12 +19,14 @@ BIN_OPS = {
 }
 
 class VM():
-    def __init__(self, chunk):
-        self.chunk = chunk
+    def __init__(self):
         self.ip = 0
         self.stack = []
+        self.globals = {}
 
     def interpret(self, chunk):
+        self.ip = 0
+        self.chunk = chunk
         return self.run()
 
     def read_op(self):
@@ -66,32 +69,68 @@ class VM():
             self.push(c)
         else:
             self.runtime_error("Operands must be numbers.")
-            return (InterpretResult.INTERPRET_RUNTIME_ERROR, None)
+            return InterpretResult.INTERPRET_RUNTIME_ERROR
 
     def run(self):
         """
         Returns tuple of (InterpretResult, result)
         """
+        #self.chunk.disassemble()
         while True:
             instruction = self.read_op()
             match instruction:
                 case OP.CONSTANT:
                     constant = self.read_constant()
                     self.push(constant)
+
                 case OP.NIL:
                     self.push(Value(None))
+
                 case OP.TRUE:
                     self.push(Value(True))
+
                 case OP.FALSE:
                     self.push(Value(False))
+
+                case OP.POP:
+                    self.pop()
+
+                case OP.GET_GLOBAL:
+                    name = self.read_constant()
+                    value = self.globals.get(name, None)
+                    if value is None:
+                        self.runtime_error(f"Undefined variable '{name.value}'")
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+                    self.push(value)
+
+                case OP.SET_GLOBAL:
+                    name = self.read_constant()
+                    if name not in self.globals.keys():
+                        self.runtime_error(f"Undefined variable '{name.value}'")
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+                    self.globals[name] = self.peek(0)
+
+                case OP.DEFINE_GLOBAL:
+                    name = self.read_constant()
+                    self.globals[name] = self.peek(0)
+                    self.pop()
+
                 case OP.EQUAL:
                     b = self.pop()
                     a = self.pop()
                     self.push(Value(a == b))
+
                 case OP.GREATER:
                     self._binary_op(">")
                 case OP.LESS:
                     self._binary_op("<")
+                case OP.SUBTRACT:
+                    self._binary_op("-")
+                case OP.MULTIPLY:
+                    self._binary_op("*")
+                case OP.DIVIDE:
+                    self._binary_op("/")
+
                 case OP.ADD:
                     if self.peek(0).is_string() and self.peek(1).is_string():
                         self.concatenate()
@@ -99,24 +138,27 @@ class VM():
                         self._binary_op("+")
                     else:
                         self.runtime_error("Operands must be two numbers or two string")
-                        return (InterpretResult.INTERPRET_RUNTIME_ERROR, None)
-                case OP.SUBTRACT:
-                    self._binary_op("-")
-                case OP.MULTIPLY:
-                    self._binary_op("*")
-                case OP.DIVIDE:
-                    self._binary_op("/")
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+
                 case OP.NOT:
                     old_val = self.pop()
                     new_val = Value(not(old_val.is_falsey()))
                     self.push(new_val)
+
                 case OP.NEGATE:
                     if not self.peek(0).is_number():
                         self.runtime_error("Operand must be a number.")
-                        return (InterpretResult.INTERPRET_RUNTIME_ERROR, None)
+                        return InterpretResult.INTERPRET_RUNTIME_ERROR
                     self.push(Value(-self.pop().value))
+
+                case OP.PRINT:
+                    print(self.pop())
+
                 case OP.RETURN:
-                    return (InterpretResult.INTERPRET_OK, self.pop())
+                    # TODO: now that we've implemented print statements, should we just
+                    # be returning the InterpretStatus?
+                    return InterpretResult.INTERPRET_OK
+
                 case _:
                     print("Unknown opcode {instruction}")
-                    return (InterpretResult.INTERPRET_RUNTIME_ERROR, None)
+                    return InterpretResult.INTERPRET_RUNTIME_ERROR

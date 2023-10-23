@@ -11,6 +11,9 @@ class Value():
 
         return self.value == other.value
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __str__(self):
         if self.value is None:
             return "nil"

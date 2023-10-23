@@ -4,6 +4,8 @@ from compiler import PrattParser
 from scanner import Scanner
 from vm import VM, InterpretResult
 
+vm = VM()
+
 class PyLox():
     def __init__(self):
         self.had_error = False
@@ -48,11 +50,7 @@ class PyLox():
         if compiler.had_error:
             return None
 
-        vm = VM(chunk)
-        status, result = vm.interpret(chunk)
-        if status == InterpretResult.INTERPRET_OK:
-            print(result)
-        return (status, result)
+        return vm.interpret(chunk)
 
 
 if __name__ == "__main__":
