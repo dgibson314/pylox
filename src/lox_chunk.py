@@ -8,6 +8,8 @@ OpCode = Enum("OpCode", [
     "FALSE",
     "EQUAL",
     "POP",
+    "GET_LOCAL",
+    "SET_LOCAL",
     "GET_GLOBAL",
     "SET_GLOBAL",
     "DEFINE_GLOBAL",
@@ -49,11 +51,18 @@ class Chunk():
         print(value.value)
         return offset + 2
 
+    def byte_instruction(self, op, offset):
+        slot = self.code[offset + 1]
+        print(f"{op} {slot}")
+        return offset + 2
+
     def disassemble_instruction(self, offset):
         print(f"{str(offset).zfill(4)} ", end="")
 
         op = self.code[offset]
         match op:
+            case OpCode.GET_LOCAL | OpCode.SET_LOCAL:
+                return self.byte_instruction(op, offset)
             case OpCode.CONSTANT \
                | OpCode.GET_GLOBAL \
                | OpCode.SET_GLOBAL \

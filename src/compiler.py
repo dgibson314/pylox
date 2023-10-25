@@ -1,4 +1,5 @@
 from collections import namedtuple
+from dataclasses import dataclass
 from enum import Enum
 import pdb
 
@@ -6,6 +7,7 @@ from lox_chunk import Chunk
 from lox_chunk import OpCode as OP
 from lox_value import Value
 from tokens import TokenType as TT
+from tokens import Token
 
 PREC_NONE = 0
 PREC_ASSIGNMENT = 1
@@ -21,6 +23,23 @@ PREC_PRIMARY = 10
 
 ParseRule = namedtuple("ParseRule", ["prefix", "infix", "precedence"])
 
+@dataclass
+class Scope:
+    _locals: list
+    count: int = 0
+    scope_depth: int = 0
+
+@dataclass
+class Local:
+    name: Token
+    depth: int
+    initialized: bool
+
+#Scope = namedtuple("Scope", ["locals", "count", "scope_depth"])
+
+# Depth field records the scope depth of the block where the local var was declared
+#Local = namedtuple("Local", ["name", "depth", "initialized"])
+
 class PrattParser():
    
     def __init__(self, tokens):
@@ -31,6 +50,8 @@ class PrattParser():
         self.current = None
         self.had_error = False
         self.panic_mode = False
+
+        self.scope = Scope([], 0, 0)
 
         self.chunk = Chunk()
 
@@ -142,6 +163,16 @@ class PrattParser():
     def end_compiler(self):
         self.emit_return()
 
+    def begin_scope(self):
+        self.scope.scope_depth += 1
+
+    def end_scope(self):
+        self.scope.scope_depth -= 1
+
+        while self.scope._locals and self.scope._locals[-1].depth > self.scope.scope_depth:
+            self.emit_byte(OP.POP)
+            self.scope._locals.pop()
+
     def binary(self):
         tt_type = self.previous._type
 
@@ -179,7 +210,15 @@ class PrattParser():
     def expression(self):
         self.parse_precedence(PREC_ASSIGNMENT)
 
+    def block(self):
+        while self.current._type != TT.RIGHT_BRACE and self.current._type != TT.EOF:
+            self.declaration()
+        self.consume(TT.RIGHT_BRACE, "Expect '}' after block.")
+
     def define_variable(self, global_idx):
+        if self.scope.scope_depth > 0:
+            self.scope._locals[-1].initialized = True
+            return
         self.emit_bytes(OP.DEFINE_GLOBAL, global_idx)
 
     def var_declaration(self):
@@ -236,6 +275,10 @@ class PrattParser():
     def statement(self):
         if self.match(TT.PRINT):
             self.print_statement()
+        elif self.match(TT.LEFT_BRACE):
+            self.begin_scope()
+            self.block()
+            self.end_scope()
         else:
             self.expression_statement()
 
@@ -250,14 +293,31 @@ class PrattParser():
     def variable(self, can_assign):
         self.named_variable(self.previous, can_assign)
 
-    def named_variable(self, tok_name, can_assign):
-        arg_idx = self.identifier_constant(tok_name)
+    def named_variable(self, name, can_assign):
+        get_op = OP.GET_GLOBAL
+        set_op = OP.SET_GLOBAL
+
+        arg = self.resolve_local(self.scope, name)
+        if arg != -1:
+            get_op = OP.GET_LOCAL
+            set_op = OP.SET_LOCAL
+        else:
+            arg = self.identifier_constant(name)
 
         if can_assign and self.match(TT.EQUAL):
             self.expression()
-            self.emit_bytes(OP.SET_GLOBAL, arg_idx)
+            self.emit_bytes(set_op, arg)
         else:
-            self.emit_bytes(OP.GET_GLOBAL, arg_idx)
+            self.emit_bytes(get_op, arg)
+
+    def resolve_local(self, scope, name):
+        for index, local in reversed(list(enumerate(scope._locals))):
+            if local.name.lexeme == name.lexeme:
+                # var a = a;
+                if local.initialized == False:
+                    self.error("Can't read local variable in its own initializer.")
+                return index
+        return -1
 
     def unary(self):
         tt_type = self.previous._type
@@ -300,6 +360,32 @@ class PrattParser():
         constant_index = self.chunk.add_constant(value)
         return constant_index
 
+    def add_local(self, name):
+        # Locals are uninitialized when first declared
+        local = Local(name, self.scope.scope_depth, False)
+        self.scope._locals.append(local)
+
+    def declare_variable(self):
+        # Global variables are implicitly declared.
+        if self.scope.scope_depth == 0:
+            return
+
+        var_name = self.previous
+
+        # It's an error to have two variables with the same name in the same local scope
+        for local in self.scope._locals[::-1]:
+            if local.depth != -1 and local.depth < self.scope.scope_depth:
+                break
+            if var_name == local.name:
+                self.error("Already variable with this name in this scope.")
+
+        self.add_local(self.previous)
+
     def parse_variable(self, message):
         self.consume(TT.IDENTIFIER, message)
+
+        self.declare_variable()
+        if self.scope.scope_depth > 0:
+            return 0
+
         return self.identifier_constant(self.previous)

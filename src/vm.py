@@ -95,6 +95,14 @@ class VM():
                 case OP.POP:
                     self.pop()
 
+                case OP.GET_LOCAL:
+                    slot = self.read_op()
+                    self.push(self.stack[slot])
+
+                case OP.SET_LOCAL:
+                    slot = self.read_op()
+                    self.stack[slot] = peek(0)
+
                 case OP.GET_GLOBAL:
                     name = self.read_constant()
                     value = self.globals.get(name, None)
