@@ -82,7 +82,8 @@ class PrattParser():
             TT.FOR:             ParseRule(None, None, PREC_NONE),
             TT.IF:              ParseRule(None, None, PREC_NONE),
             TT.NIL:             ParseRule(self.literal, None, PREC_NONE),
-            TT.OR:              ParseRule(None, None, PREC_NONE),
+            TT.OR:              ParseRule(None, self.or_, PREC_OR),
+            TT.AND:             ParseRule(None, self.and_, PREC_AND),
             TT.NUMBER:          ParseRule(self.number, None, PREC_NONE),
             TT.RETURN:          ParseRule(None, None, PREC_NONE),
             TT.THIS:            ParseRule(None, None, PREC_NONE),
@@ -153,12 +154,35 @@ class PrattParser():
         self.emit_byte(op1)
         self.emit_byte(op2)
 
+    def emit_loop(self, loop_start):
+        self.emit_byte(OP.LOOP)
+
+        # +1 to take into account size of OP.LOOP's operand
+        offset = len(self.chunk.code) - loop_start + 1
+
+        self.emit_byte(offset)
+
+    def emit_jump(self, op):
+        """
+        Emits a bytecode instruction and writes a placeholder operand for the jump
+        offset.
+        Returns the offset of the emitted instruction in the chunk.
+        """
+        self.emit_byte(op)
+        self.emit_byte(None)
+        return len(self.chunk.code) - 1
+
     def emit_return(self):
         self.emit_byte(OP.RETURN)
 
     def emit_constant(self, value):
         constant_index = self.chunk.add_constant(value)
         self.emit_bytes(OP.CONSTANT, constant_index)
+
+    def patch_jump(self, offset):
+        # -1 to adjust for the bytecode for the jump offset itself
+        jump = len(self.chunk.code) - offset - 1
+        self.chunk.code[offset] = jump
 
     def end_compiler(self):
         self.emit_return()
@@ -221,6 +245,24 @@ class PrattParser():
             return
         self.emit_bytes(OP.DEFINE_GLOBAL, global_idx)
 
+    def or_(self):
+        else_jump = self.emit_jump(OP.JUMP_IF_FALSE)
+        end_jump = self.emit_jump(OP.JUMP)
+
+        self.patch_jump(else_jump)
+        self.emit_byte(OP.POP)
+
+        self.parse_precedence(PREC_OR)
+        self.patch_jump(end_jump)
+
+    def and_(self):
+        end_jump = self.emit_jump(OP.JUMP_IF_FALSE)
+
+        self.emit_byte(OP.POP)
+        self.parse_precedence(PREC_AND)
+
+        self.patch_jump(end_jump)
+
     def var_declaration(self):
         global_idx = self.parse_variable("Expect variable name.")
 
@@ -238,10 +280,92 @@ class PrattParser():
         self.consume(TT.SEMICOLON, "Expect ';' after expression.")
         self.emit_byte(OP.POP)
 
+    def for_statement(self):
+        self.begin_scope()
+        self.consume(TT.LEFT_PAREN, "Expect '(' after 'for'.")
+        if self.match(TT.SEMICOLON):
+            # No initializer
+            pass
+        elif self.match(TT.VAR):
+            self.var_declaration()
+        else:
+            self.expression_statement()
+
+        # Condition expression for exit
+        loop_start = len(self.chunk.code)
+        exit_jump = -1
+        if not self.match(TT.SEMICOLON):
+            self.expression()
+            self.consume(TT.SEMICOLON, "Expect ';' after loop condition.")
+
+            # Jump out of loop if condition is false
+            exit_jump = self.emit_jump(OP.JUMP_IF_FALSE)
+            # Pop condition expression off stack
+            self.emit_byte(OP.POP)
+
+        if not self.match(TT.RIGHT_PAREN):
+            body_jump = self.emit_jump(OP.JUMP)
+
+            increment_start = len(self.chunk.code)
+            self.expression()
+            self.emit_byte(OP.POP)
+            self.consume(TT.RIGHT_PAREN, "Expect ')' after for clauses.")
+
+            self.emit_loop(loop_start)
+            loop_start = increment_start
+            self.patch_jump(body_jump)
+
+        self.statement()
+        self.emit_loop(loop_start)
+
+        if exit_jump != -1:
+            self.patch_jump(exit_jump)
+            self.emit_byte(OP.POP)
+
+        self.end_scope()
+
+    def if_statement(self):
+        # The OP.POP instructions are to handle cleaning up the condition value
+        # on the stack.
+        self.consume(TT.LEFT_PAREN, "Expect '(' after 'if'.")
+        self.expression()
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after condition.")
+
+        then_jump = self.emit_jump(OP.JUMP_IF_FALSE)
+        self.emit_byte(OP.POP)
+        self.statement()
+
+        else_jump = self.emit_jump(OP.JUMP)
+
+        self.patch_jump(then_jump)
+        self.emit_byte(OP.POP)
+
+        if self.match(TT.ELSE):
+            self.statement()
+        self.patch_jump(else_jump)
+
     def print_statement(self):
         self.expression()
         self.consume(TT.SEMICOLON, "Expect ';' after value.")
         self.emit_byte(OP.PRINT)
+
+    def while_statement(self):
+        # Keep track of the start of statement; we'll jump back here after evaluating
+        # the body of the loop
+        loop_start = len(self.chunk.code)
+
+        self.consume(TT.LEFT_PAREN, "Expect '(' after 'while'.")
+        self.expression()
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after condition.")
+
+        exit_jump = self.emit_jump(OP.JUMP_IF_FALSE)
+        self.emit_byte(OP.POP)
+        self.statement()
+
+        self.emit_loop(loop_start)
+
+        self.patch_jump(exit_jump)
+        self.emit_byte(OP.POP)
 
     def synchronize(self):
         self.panic_mode = False
@@ -275,6 +399,12 @@ class PrattParser():
     def statement(self):
         if self.match(TT.PRINT):
             self.print_statement()
+        elif self.match(TT.IF):
+            self.if_statement()
+        elif self.match(TT.FOR):
+            self.for_statement()
+        elif self.match(TT.WHILE):
+            self.while_statement()
         elif self.match(TT.LEFT_BRACE):
             self.begin_scope()
             self.block()

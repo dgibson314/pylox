@@ -22,6 +22,9 @@ OpCode = Enum("OpCode", [
     "NOT",
     "NEGATE",
     "PRINT",
+    "JUMP",
+    "JUMP_IF_FALSE",
+    "LOOP",
     "RETURN",
 ])
 
@@ -53,7 +56,12 @@ class Chunk():
 
     def byte_instruction(self, op, offset):
         slot = self.code[offset + 1]
-        print(f"{op} {slot}")
+        print(f"{op.name} {slot}")
+        return offset + 2
+
+    def jump_instruction(self, op, sign, offset):
+        jump = self.code[offset + 1]
+        print(f"{op.name} {offset} {offset + 2 + sign * jump}")
         return offset + 2
 
     def disassemble_instruction(self, offset):
@@ -61,13 +69,23 @@ class Chunk():
 
         op = self.code[offset]
         match op:
-            case OpCode.GET_LOCAL | OpCode.SET_LOCAL:
+            case OpCode.JUMP \
+               | OpCode.JUMP_IF_FALSE:
+                return self.jump_instruction(op, 1, offset)
+
+            case OpCode.LOOP:
+                return self.jump_instruction(op, -1, offset)
+
+            case OpCode.GET_LOCAL \
+               | OpCode.SET_LOCAL:
                 return self.byte_instruction(op, offset)
+
             case OpCode.CONSTANT \
                | OpCode.GET_GLOBAL \
                | OpCode.SET_GLOBAL \
                | OpCode.DEFINE_GLOBAL :
                 return self.constant_instruction(op, offset)
+
             case OpCode.NEGATE \
                | OpCode.RETURN \
                | OpCode.FALSE \
@@ -85,6 +103,7 @@ class Chunk():
                | OpCode.PRINT \
                | OpCode.NOT:
                 return self.simple_instruction(op, offset)
+
             case _:
                 print(f"Unknown opcode {op}")
                 return offset + 1

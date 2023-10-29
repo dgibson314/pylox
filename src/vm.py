@@ -75,7 +75,7 @@ class VM():
         """
         Returns tuple of (InterpretResult, result)
         """
-        #self.chunk.disassemble()
+        self.chunk.disassemble()
         while True:
             instruction = self.read_op()
             match instruction:
@@ -101,7 +101,7 @@ class VM():
 
                 case OP.SET_LOCAL:
                     slot = self.read_op()
-                    self.stack[slot] = peek(0)
+                    self.stack[slot] = self.peek(0)
 
                 case OP.GET_GLOBAL:
                     name = self.read_constant()
@@ -161,6 +161,19 @@ class VM():
 
                 case OP.PRINT:
                     print(self.pop())
+
+                case OP.JUMP:
+                    offset = self.read_op()
+                    self.ip += offset
+
+                case OP.JUMP_IF_FALSE:
+                    offset = self.read_op()
+                    if self.peek(0).is_falsey():
+                        self.ip += offset
+
+                case OP.LOOP:
+                    offset = self.read_op()
+                    self.ip -= offset
 
                 case OP.RETURN:
                     # TODO: now that we've implemented print statements, should we just
