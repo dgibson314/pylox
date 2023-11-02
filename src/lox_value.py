@@ -35,3 +35,10 @@ class Value():
     def is_falsey(self):
         return self.value is None or self.value is False
 
+
+class Function():
+    def __init__(self, obj, arity, chunk, name):
+        self.obj = obj
+        self.arity = arity
+        self.chunk = chunk
+        self.name = name
