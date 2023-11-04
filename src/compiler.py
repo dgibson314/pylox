@@ -5,6 +5,7 @@ import pdb
 
 from lox_chunk import Chunk
 from lox_chunk import OpCode as OP
+from lox_object import Object, ObjString
 from lox_value import Value
 from tokens import TokenType as TT
 from tokens import Token
@@ -418,7 +419,9 @@ class PrattParser():
         self.emit_constant(value)
 
     def string(self):
-        self.emit_constant(Value(self.previous.literal))
+        interned = ObjString(self.previous.literal)
+        self.emit_constant(Value(interned))
+        #self.emit_constant(Value(self.previous.literal))
 
     def variable(self, can_assign):
         self.named_variable(self.previous, can_assign)

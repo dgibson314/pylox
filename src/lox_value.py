@@ -1,3 +1,5 @@
+from lox_object import Object, ObjString
+
 class Value():
     def __init__(self, value):
         self.value = value
@@ -8,6 +10,9 @@ class Value():
 
         if self.value is None and other.value is None:
             return True
+
+        if isinstance(self.value, Object) and isinstance(other.value, Object):
+            return self.value.__eq__(other.value)
 
         return self.value == other.value
 
@@ -30,7 +35,10 @@ class Value():
         return isinstance(self.value, float)
 
     def is_string(self):
-        return isinstance(self.value, str)
+        return isinstance(self.value, ObjString)
+
+    def is_object(self):
+        return isinstance(self.value, Object)
 
     def is_falsey(self):
         return self.value is None or self.value is False
