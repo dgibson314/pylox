@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from lox_chunk import Chunk
+
 OBJ_STRING = 1
 OBJ_FUNCTION = 2
 
@@ -39,11 +41,16 @@ class ObjString(Object):
         return ObjString(self.chars + other.chars)
 
 class ObjFunction(Object):
-    def __init__(self, arity, chunk, name):
-        super().__init__(OBJ_FUNCTION)
+    def __init__(self, arity=0, chunk=None, name=""):
         self.arity = arity
-        self.chunk = chunk
+        self.chunk = chunk if chunk is not None else Chunk()
         self.name = name
+        super().__init__(OBJ_FUNCTION)
 
     def __str__(self):
-        print(f"<fn {self.name}>")
+        if self.name == "":
+            return "<script>"
+        return f"<fn {self.name}>"
+
+    def __eq__(self, other):
+        raise NotImplementedError

@@ -1,11 +1,11 @@
 from collections import namedtuple
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 import pdb
 
 from lox_chunk import Chunk
 from lox_chunk import OpCode as OP
-from lox_object import Object, ObjString
+from lox_object import Object, ObjString, ObjFunction
 from lox_value import Value
 from tokens import TokenType as TT
 from tokens import Token
@@ -27,7 +27,6 @@ ParseRule = namedtuple("ParseRule", ["prefix", "infix", "precedence"])
 @dataclass
 class Scope:
     _locals: list
-    count: int = 0
     scope_depth: int = 0
 
 @dataclass
@@ -36,25 +35,27 @@ class Local:
     depth: int
     initialized: bool
 
-#Scope = namedtuple("Scope", ["locals", "count", "scope_depth"])
-
-# Depth field records the scope depth of the block where the local var was declared
-#Local = namedtuple("Local", ["name", "depth", "initialized"])
+class FunctionType(IntEnum):
+    FUNCTION = 0
+    SCRIPT = 1
 
 class PrattParser():
    
-    def __init__(self, tokens):
+    def __init__(self, tokens, function_type):
         self.tokens = tokens
-        self.current = 0
+        self.function_type = function_type
 
         self.index = -1
         self.current = None
         self.had_error = False
         self.panic_mode = False
 
-        self.scope = Scope([], 0, 0)
+        self.scope = Scope([], 0)
 
-        self.chunk = Chunk()
+        # Compiler implicitly claims stack slot zero for internal use
+        self.add_local(Token(None, "", None, None))
+
+        self.function = ObjFunction()
 
         self.parse_rules = {
             TT.LEFT_PAREN:      ParseRule(self.grouping, None, PREC_NONE),
@@ -100,7 +101,11 @@ class PrattParser():
             self.declaration()
 
         self.end_compiler()
-        return self.chunk
+        return self.function
+
+    @property
+    def chunk(self):
+        return self.function.chunk
 
     def advance(self):
         if self.current and self.current._type == TT.EOF:

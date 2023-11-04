@@ -2,7 +2,7 @@ from enum import Enum
 import operator
 import pdb
 
-from compiler import PrattParser
+from compiler import PrattParser, FunctionType
 from lox_chunk import OpCode as OP
 from lox_object import Object
 from lox_value import Value
@@ -21,9 +21,16 @@ BIN_OPS = {
     ">": operator.gt
 }
 
+class CallFrame:
+    def __init__(self, function, ip, slots):
+        self.function = function
+        self.ip = ip
+        self.slots = slots
+
+
 class VM():
     def __init__(self):
-        self.ip = 0
+        self.frames = []
         self.stack = []
         self.globals = {}
 
@@ -31,28 +38,31 @@ class VM():
         self.ip = 0
         tokens = Scanner(source).scan_tokens()
         
-        compiler = PrattParser(tokens)
-        self.chunk = compiler.compile()
+        compiler = PrattParser(tokens, FunctionType.SCRIPT)
+        function = compiler.compile()
 
         if compiler.had_error:
             return InterpretResult.COMPILE_ERROR
 
+        self.push(Value(function))
+        self.frames.append(CallFrame(function, 0, self.stack))
+
         return self.run()
 
-    def read_op(self):
-        op = self.chunk.code[self.ip]
-        self.ip += 1
+    def read_op(self, frame):
+        op = frame.function.chunk.code[frame.ip]
+        frame.ip += 1
         return op
 
     def runtime_error(self, message):
         print(message)
 
-        line = self.chunk.lines[self.ip - 1]
+        line = self.frame.function.chunk.lines[self.frame.ip - 1]
         print(f"[line {line}] in script")
 
-    def read_constant(self):
-        index = self.read_op()
-        return self.chunk.constants[index]
+    def read_constant(self, frame):
+        index = self.read_op(frame)
+        return frame.function.chunk.constants[index]
 
     def push(self, value):
         self.stack.append(value)
@@ -85,12 +95,21 @@ class VM():
         """
         Returns tuple of (InterpretResult, result)
         """
-        self.chunk.disassemble()
+        frame = self.frames[-1]
+
+        # TODO: only if some `debug` arg is passed
+        frame.function.chunk.disassemble()
+
         while True:
-            instruction = self.read_op()
+            # TODO: only do if some `debug` arg is passed
+            for value in self.stack:
+                print(f"[ {value} ]", end="")
+            print("")
+
+            instruction = self.read_op(frame)
             match instruction:
                 case OP.CONSTANT:
-                    constant = self.read_constant()
+                    constant = self.read_constant(frame)
                     self.push(constant)
 
                 case OP.NIL:
@@ -106,15 +125,15 @@ class VM():
                     self.pop()
 
                 case OP.GET_LOCAL:
-                    slot = self.read_op()
-                    self.push(self.stack[slot])
+                    slot = self.read_op(frame)
+                    self.push(frame.slots[slot])
 
                 case OP.SET_LOCAL:
-                    slot = self.read_op()
-                    self.stack[slot] = self.peek(0)
+                    slot = self.read_op(frame)
+                    frame.slots[slot] = self.peek(0)
 
                 case OP.GET_GLOBAL:
-                    name = self.read_constant()
+                    name = self.read_constant(frame)
                     value = self.globals.get(name, None)
                     if value is None:
                         self.runtime_error(f"Undefined variable '{name.value}'")
@@ -122,14 +141,14 @@ class VM():
                     self.push(value)
 
                 case OP.SET_GLOBAL:
-                    name = self.read_constant()
+                    name = self.read_constant(frame)
                     if name not in self.globals.keys():
                         self.runtime_error(f"Undefined variable '{name.value}'")
                         return InterpretResult.RUNTIME_ERROR
                     self.globals[name] = self.peek(0)
 
                 case OP.DEFINE_GLOBAL:
-                    name = self.read_constant()
+                    name = self.read_constant(frame)
                     self.globals[name] = self.peek(0)
                     self.pop()
 
@@ -173,17 +192,17 @@ class VM():
                     print(self.pop())
 
                 case OP.JUMP:
-                    offset = self.read_op()
-                    self.ip += offset
+                    offset = self.read_op(frame)
+                    frame.ip += offset
 
                 case OP.JUMP_IF_FALSE:
-                    offset = self.read_op()
+                    offset = self.read_op(frame)
                     if self.peek(0).is_falsey():
-                        self.ip += offset
+                        frame.ip += offset
 
                 case OP.LOOP:
-                    offset = self.read_op()
-                    self.ip -= offset
+                    offset = self.read_op(frame)
+                    frame.ip -= offset
 
                 case OP.RETURN:
                     # TODO: now that we've implemented print statements, should we just
