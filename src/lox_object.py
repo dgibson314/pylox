@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 OBJ_STRING = 1
+OBJ_FUNCTION = 2
 
 class Object(ABC):
     instances = []
@@ -36,3 +37,13 @@ class ObjString(Object):
         if not isinstance(other, ObjString):
             raise TypeError
         return ObjString(self.chars + other.chars)
+
+class ObjFunction(Object):
+    def __init__(self, arity, chunk, name):
+        super().__init__(OBJ_FUNCTION)
+        self.arity = arity
+        self.chunk = chunk
+        self.name = name
+
+    def __str__(self):
+        print(f"<fn {self.name}>")
