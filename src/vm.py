@@ -2,11 +2,14 @@ from enum import Enum
 import operator
 import pdb
 
+from compiler import PrattParser
 from lox_chunk import OpCode as OP
+from lox_object import Object
 from lox_value import Value
+from scanner import Scanner
 
 InterpretResult = Enum("InterpretResult", [
-    "INTERPRET_OK", "INTERPRET_COMPILE_ERROR", "INTERPRET_RUNTIME_ERROR"
+    "OK", "COMPILE_ERROR", "RUNTIME_ERROR"
 ])
 
 BIN_OPS = {
@@ -24,9 +27,16 @@ class VM():
         self.stack = []
         self.globals = {}
 
-    def interpret(self, chunk):
+    def interpret(self, source):
         self.ip = 0
-        self.chunk = chunk
+        tokens = Scanner(source).scan_tokens()
+        
+        compiler = PrattParser(tokens)
+        self.chunk = compiler.compile()
+
+        if compiler.had_error:
+            return InterpretResult.COMPILE_ERROR
+
         return self.run()
 
     def read_op(self):
@@ -69,7 +79,7 @@ class VM():
             self.push(c)
         else:
             self.runtime_error("Operands must be numbers.")
-            return InterpretResult.INTERPRET_RUNTIME_ERROR
+            return InterpretResult.RUNTIME_ERROR
 
     def run(self):
         """
@@ -108,14 +118,14 @@ class VM():
                     value = self.globals.get(name, None)
                     if value is None:
                         self.runtime_error(f"Undefined variable '{name.value}'")
-                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+                        return InterpretResult.RUNTIME_ERROR
                     self.push(value)
 
                 case OP.SET_GLOBAL:
                     name = self.read_constant()
                     if name not in self.globals.keys():
                         self.runtime_error(f"Undefined variable '{name.value}'")
-                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+                        return InterpretResult.RUNTIME_ERROR
                     self.globals[name] = self.peek(0)
 
                 case OP.DEFINE_GLOBAL:
@@ -146,7 +156,7 @@ class VM():
                         self._binary_op("+")
                     else:
                         self.runtime_error("Operands must be two numbers or two string")
-                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+                        return InterpretResult.RUNTIME_ERROR
 
                 case OP.NOT:
                     old_val = self.pop()
@@ -156,7 +166,7 @@ class VM():
                 case OP.NEGATE:
                     if not self.peek(0).is_number():
                         self.runtime_error("Operand must be a number.")
-                        return InterpretResult.INTERPRET_RUNTIME_ERROR
+                        return InterpretResult.RUNTIME_ERROR
                     self.push(Value(-self.pop().value))
 
                 case OP.PRINT:
@@ -178,8 +188,8 @@ class VM():
                 case OP.RETURN:
                     # TODO: now that we've implemented print statements, should we just
                     # be returning the InterpretStatus?
-                    return InterpretResult.INTERPRET_OK
+                    return InterpretResult.OK
 
                 case _:
                     print("Unknown opcode {instruction}")
-                    return InterpretResult.INTERPRET_RUNTIME_ERROR
+                    return InterpretResult.RUNTIME_ERROR
