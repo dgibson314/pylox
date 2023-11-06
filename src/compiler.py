@@ -41,11 +41,10 @@ class FunctionType(IntEnum):
 
 class PrattParser():
    
-    def __init__(self, tokens, function_type):
-        self.tokens = tokens
+    def __init__(self, function_type, scanner):
         self.function_type = function_type
+        self.scanner = scanner
 
-        self.index = -1
         self.current = None
         self.had_error = False
         self.panic_mode = False
@@ -108,12 +107,12 @@ class PrattParser():
         return self.function.chunk
 
     def advance(self):
-        if self.current and self.current._type == TT.EOF:
-            return self.error("Unexpected EOF")
         self.previous = self.current
-        self.index += 1
-        self.current = self.tokens[self.index]
-        if self.current == TT.ERROR:
+
+        while True:
+            self.current = self.scanner.scan_token()
+            if self.current is not TT.ERROR:
+                break
             self.error_at_current(self.current.lexeme)
 
     def match(self, token_type):
@@ -135,7 +134,7 @@ class PrattParser():
         self.error_at(self.current, message)
 
     def error(self, message):
-        self.error_at(self.tokens[self.index-2], message)
+        self.error_at(self.previous, message)
 
     def error_at(self, token, message):
         if self.panic_mode:
@@ -410,7 +409,7 @@ class PrattParser():
             self.advance()
 
     def declaration(self):
-        if self.match((TT.FUN):
+        if self.match(TT.FUN):
             self.fun_declaration()
         elif self.match(TT.VAR):
             self.var_declaration()
