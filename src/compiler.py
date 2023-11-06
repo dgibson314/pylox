@@ -245,6 +245,22 @@ class PrattParser():
             self.declaration()
         self.consume(TT.RIGHT_BRACE, "Expect '}' after block.")
 
+    def fun_declaration(self):
+        global_idx = self.parse_variable("Expect function name.")
+
+        # Mark the function declaration's variable "initialized" as soon as we compile
+        # the name so that it can be referenced in the function's body without generating
+        # an error.
+        if self.scope.scope_depth > 0:
+            self.scope._locals[-1].initialized = True
+
+        self.function(FunctionType.FUNCTION)
+
+        self.define_variable(global_idx)
+
+    def function(self, function_type):
+        pass
+
     def define_variable(self, global_idx):
         if self.scope.scope_depth > 0:
             self.scope._locals[-1].initialized = True
@@ -394,7 +410,9 @@ class PrattParser():
             self.advance()
 
     def declaration(self):
-        if self.match(TT.VAR):
+        if self.match((TT.FUN):
+            self.fun_declaration()
+        elif self.match(TT.VAR):
             self.var_declaration()
         else:
             self.statement()
