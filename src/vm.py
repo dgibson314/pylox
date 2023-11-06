@@ -29,9 +29,8 @@ class VM():
 
     def interpret(self, source):
         self.ip = 0
-        tokens = Scanner(source).scan_tokens()
-        
-        compiler = PrattParser(tokens)
+        scanner = Scanner(source)
+        compiler = PrattParser(scanner)
         self.chunk = compiler.compile()
 
         if compiler.had_error:

@@ -25,20 +25,12 @@ class Scanner():
         self.current += 1
         return char
 
-    def add_token(self, token_type, literal=None):
+    def make_token(self, token_type, literal=None):
         text = self.source[self.start : self.current]
-        self.tokens.append(Token(token_type, text, literal, self.line))
+        return Token(token_type, text, literal, self.line)
 
     def error_token(self, message):
-        self.tokens.append(Token(TT.ERROR, message, None, self.line))
-
-    def scan_tokens(self):
-        while not self.is_at_end():
-            self.start = self.current
-            self.scan_token()
-
-        self.tokens.append(Token(TT.EOF, "", None, self.line))
-        return self.tokens
+        return Token(TT.ERROR, message, None, self.line)
 
     def match(self, expected):
         if self.is_at_end():
@@ -59,6 +51,23 @@ class Scanner():
             return '\0'
         return self.source[self.current + 1]
 
+    def skip_whitespace(self):
+        while True:
+            c = self.peek()
+            match c:
+                case ' ' | '\r' | '\t':
+                    self.advance()
+                case '\n':
+                    self.line += 1
+                    self.advance()
+                case '/':
+                    if self.peek_next() == '/':
+                        # Comments go until the end of the line
+                        while self.peek() != '\n' and not self.is_at_end():
+                            self.advance()
+                case _:
+                    return
+
     @staticmethod
     def is_alpha(c):
         return (c >= 'a' and c <= 'z') or \
@@ -73,45 +82,46 @@ class Scanner():
         return c >= '0' and c <= '9'
 
     def scan_token(self):
+        self.skip_whitespace()
+        self.start = self.current
+
+        if self.is_at_end(): return self.make_token(TT.EOF)
+
         c = self.advance()
         match c:
-            case '(': self.add_token(TT.LEFT_PAREN)
-            case ')': self.add_token(TT.RIGHT_PAREN)
-            case '{': self.add_token(TT.LEFT_BRACE)
-            case '}': self.add_token(TT.RIGHT_BRACE)
-            case ',': self.add_token(TT.COMMA)
-            case '.': self.add_token(TT.DOT)
-            case '-': self.add_token(TT.MINUS)
-            case '+': self.add_token(TT.PLUS)
-            case ';': self.add_token(TT.SEMICOLON)
-            case '*': self.add_token(TT.STAR)
+            case '(': return self.make_token(TT.LEFT_PAREN)
+            case ')': return self.make_token(TT.RIGHT_PAREN)
+            case '{': return self.make_token(TT.LEFT_BRACE)
+            case '}': return self.make_token(TT.RIGHT_BRACE)
+            case ',': return self.make_token(TT.COMMA)
+            case '.': return self.make_token(TT.DOT)
+            case '-': return self.make_token(TT.MINUS)
+            case '+': return self.make_token(TT.PLUS)
+            case ';': return self.make_token(TT.SEMICOLON)
+            case '*': return self.make_token(TT.STAR)
             case '!':
-                self.add_token(TT.BANG_EQUAL if self.match('=') else TT.BANG)
+                return self.make_token(TT.BANG_EQUAL if self.match('=') else TT.BANG)
             case '=':
-                self.add_token(TT.EQUAL_EQUAL if self.match('=') else TT.EQUAL)
+                return self.make_token(TT.EQUAL_EQUAL if self.match('=') else TT.EQUAL)
             case '<':
-                self.add_token(TT.LESS_EQUAL if self.match('=') else TT.LESS)
+                return self.make_token(TT.LESS_EQUAL if self.match('=') else TT.LESS)
             case '>':
-                self.add_token(TT.GREATER_EQUAL if self.match('=') else TT.GREATER)
+                return self.make_token(TT.GREATER_EQUAL if self.match('=') else TT.GREATER)
             case '/':
                 if self.match('/'):
                     # A comment goes until the end of the line
                     while (self.peek() != '\n' and not self.is_at_end()):
                         self.advance()
                 else:
-                    self.add_token(TT.SLASH)
-            case ' ' | '\r' | '\t':
-                pass
-            case '\n':
-                self.line += 1
-            case '"': self.string()
+                    return self.make_token(TT.SLASH)
+            case '"': return self.string()
             case _: 
                 if self.is_digit(c):
-                    self.number()
+                    return self.number()
                 elif self.is_alpha(c):
-                    self.identifier()
+                    return self.identifier()
                 else:
-                    self.error_token("Unexpected character.")
+                    return self.error_token("Unexpected character.")
 
     def identifier(self):
         while self.is_alphanumeric(self.peek()):
@@ -122,7 +132,7 @@ class Scanner():
         token_type = Scanner.keywords.get(text)
         if token_type is None:
             token_type = TT.IDENTIFIER
-        self.add_token(token_type)
+        return self.make_token(token_type)
 
     def number(self):
         while self.is_digit(self.peek()):
@@ -137,7 +147,7 @@ class Scanner():
                 self.advance()
 
         number = float(self.source[self.start : self.current])
-        self.add_token(TT.NUMBER, literal=number)
+        return self.make_token(TT.NUMBER, literal=number)
 
     def string(self):
         while (self.peek() != '"' and not self.is_at_end()):
@@ -154,5 +164,5 @@ class Scanner():
 
         # Trim the surrounding quotes
         string = self.source[self.start+1 : self.current-1]
-        self.add_token(TT.STRING, literal=string)
+        return self.make_token(TT.STRING, literal=string)
 
