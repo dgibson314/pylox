@@ -24,6 +24,7 @@ OpCode = Enum("OpCode", [
     "JUMP",
     "JUMP_IF_FALSE",
     "LOOP",
+    "CALL",
     "RETURN",
 ])
 
@@ -75,7 +76,8 @@ class Chunk():
                 return self.jump_instruction(op, -1, offset)
 
             case OpCode.GET_LOCAL \
-               | OpCode.SET_LOCAL:
+               | OpCode.SET_LOCAL \
+               | OpCode.CALL:
                 return self.byte_instruction(op, offset)
 
             case OpCode.CONSTANT \

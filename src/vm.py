@@ -45,7 +45,7 @@ class VM():
             return InterpretResult.COMPILE_ERROR
 
         self.push(Value(function))
-        self.frames.append(CallFrame(function, 0, self.stack))
+        self.call_value(Value(function), 0)
 
         return self.run()
 
@@ -57,8 +57,14 @@ class VM():
     def runtime_error(self, message):
         print(message)
 
-        line = self.frame.function.chunk.lines[self.frame.ip - 1]
-        print(f"[line {line}] in script")
+        for index, frame in reversed(list(enumerate(self.frames))):
+            function = frame.function
+            instruction = function.chunk.code[frame.ip - 1]
+            line = function.chunk.lines[frame.ip - 1]
+            func_name = "script" if function.name == "" else function.name + "()"
+            print(f"[line {line}] in {func_name}")
+
+        # TODO: need to reset stack here?
 
     def read_constant(self, frame):
         index = self.read_op(frame)
@@ -73,6 +79,29 @@ class VM():
     def peek(self, distance):
         index = -1 - distance
         return self.stack[index]
+
+    def call(self, function, arg_count):
+        if arg_count != function.arity:
+            self.runtime_error(
+                f"Expected {function.arity} arguments but got {arg_count}."
+            )
+            return False
+
+        # -1 to account for slot zero, which contains function being called
+        slots_start = len(self.stack) - arg_count - 1
+
+        # TODO: should we initialize frame.slots to be the whole stack starting
+        # at `slots_start`, or just from `slots_start` to `slots_start` + args + 1?
+        frame = CallFrame(function, 0, self.stack[slots_start:])
+        self.frames.append(frame)
+        return True
+
+    def call_value(self, callee, arg_count):
+        if callee.is_function():
+            return self.call(callee.value, arg_count)
+        else:
+            self.runtime_error("Can only call functions and classes.")
+            return False
 
     def concatenate(self):
         b = self.pop().value
@@ -204,10 +233,21 @@ class VM():
                     offset = self.read_op(frame)
                     frame.ip -= offset
 
+                case OP.CALL:
+                    arg_count = self.read_op(frame)
+                    if not self.call_value(self.peek(arg_count), arg_count):
+                        return InterpretResult.RUNTIME_ERROR
+                    frame = self.frames[-1]
+
                 case OP.RETURN:
-                    # TODO: now that we've implemented print statements, should we just
-                    # be returning the InterpretStatus?
-                    return InterpretResult.OK
+                    result = self.pop()
+                    self.frames.pop()
+                    if len(self.frames) == 0:
+                        self.pop()
+                        return InterpretResult.OK
+                    self.stack = self.stack[:-(len(frame.slots))]
+                    self.push(result)
+                    frame = self.frames[-1]
 
                 case _:
                     print("Unknown opcode {instruction}")

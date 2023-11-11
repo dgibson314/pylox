@@ -1,4 +1,4 @@
-from lox_object import Object, ObjString
+from lox_object import Object, ObjString, ObjFunction
 
 class Value():
     def __init__(self, value):

@@ -64,7 +64,7 @@ class PrattParser():
             self._function.name = self.loc.previous.lexeme
 
         self.parse_rules = {
-            TT.LEFT_PAREN:      ParseRule(self.grouping, None, PREC_NONE),
+            TT.LEFT_PAREN:      ParseRule(self.grouping, self.call, PREC_CALL),
             TT.RIGHT_PAREN:     ParseRule(None, None, PREC_NONE),
             TT.LEFT_BRACE:      ParseRule(None, None, PREC_NONE),
             TT.RIGHT_BRACE:     ParseRule(None, None, PREC_NONE),
@@ -163,6 +163,8 @@ class PrattParser():
         self.chunk.write(op, self.loc.previous.line)
 
     def emit_bytes(self, op1, op2):
+        assert op1 is not None
+        assert op2 is not None
         self.emit_byte(op1)
         self.emit_byte(op2)
 
@@ -185,6 +187,7 @@ class PrattParser():
         return len(self.chunk.code) - 1
 
     def emit_return(self):
+        self.emit_byte(OP.NIL)
         self.emit_byte(OP.RETURN)
 
     def emit_constant(self, value):
@@ -232,6 +235,22 @@ class PrattParser():
             case _:
                 raise Exception("Unreachable binary operator type")
 
+    def call(self):
+        arg_count = self.argument_list()
+        self.emit_bytes(OP.CALL, arg_count)
+
+    def argument_list(self):
+        arg_count = 0
+        if self.loc.current._type != TT.RIGHT_PAREN:
+            while True:
+                self.expression()
+                arg_count +=1
+                if not self.match(TT.COMMA):
+                    break
+
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after arguments.")
+        return arg_count
+
     def literal(self):
         match self.loc.previous._type:
             case TT.FALSE: self.emit_byte(OP.FALSE)
@@ -273,15 +292,12 @@ class PrattParser():
 
         ic.consume(TT.LEFT_PAREN, "Expect '(' after function name.")
         if ic.loc.current._type != TT.RIGHT_PAREN:
-            # TODO: this is a straightforward implementation of the `do-while` loop
-            # from CLox. Should clean this up.
-            ic._function.arity += 1
-            constant_idx = ic.parse_variable("Expect parameter name.")
-            ic.define_variable(constant_idx)
-            while ic.match(TT.COMMA):
+            while True:
                 ic._function.arity += 1
                 constant_idx = ic.parse_variable("Expect parameter name.")
                 ic.define_variable(constant_idx)
+                if not ic.match(TT.COMMA):
+                    break
 
         ic.consume(TT.RIGHT_PAREN, "Expect ')' after parameters.")
         ic.consume(TT.LEFT_BRACE, "Expect '{' before function body.")
@@ -402,6 +418,17 @@ class PrattParser():
         self.consume(TT.SEMICOLON, "Expect ';' after value.")
         self.emit_byte(OP.PRINT)
 
+    def return_statement(self):
+        if self.function_type == FunctionType.SCRIPT:
+            self.error("Can't return from top-level code.")
+
+        if self.match(TT.SEMICOLON):
+            self.emit_return()
+        else:
+            self.expression()
+            self.consume(TT.SEMICOLON, "Expect ';' after return value.")
+            self.emit_byte(OP.RETURN)
+
     def while_statement(self):
         # Keep track of the start of statement; we'll jump back here after evaluating
         # the body of the loop
@@ -456,6 +483,8 @@ class PrattParser():
             self.print_statement()
         elif self.match(TT.IF):
             self.if_statement()
+        elif self.match(TT.RETURN):
+            self.return_statement()
         elif self.match(TT.FOR):
             self.for_statement()
         elif self.match(TT.WHILE):
