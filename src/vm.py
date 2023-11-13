@@ -1,10 +1,11 @@
 from enum import Enum
 import operator
 import pdb
+import time
 
 from compiler import PrattParser, FunctionType
 from lox_chunk import OpCode as OP
-from lox_object import Object
+from lox_object import Object, ObjNative
 from lox_value import Value
 from scanner import Scanner
 
@@ -21,6 +22,10 @@ BIN_OPS = {
     ">": operator.gt
 }
 
+def clock_native(arg_count, args):
+    return Value(time.time())
+
+
 class CallFrame:
     def __init__(self, function, ip, slots):
         self.function = function
@@ -33,6 +38,8 @@ class VM():
         self.frames = []
         self.stack = []
         self.globals = {}
+
+        self.define_native("clock", clock_native)
 
     def interpret(self, source):
         self.ip = 0
@@ -65,6 +72,9 @@ class VM():
             print(f"[line {line}] in {func_name}")
 
         # TODO: need to reset stack here?
+
+    def define_native(self, name, function):
+        self.globals[Value(name)] = Value(ObjNative(function))
 
     def read_constant(self, frame):
         index = self.read_op(frame)
@@ -99,6 +109,13 @@ class VM():
     def call_value(self, callee, arg_count):
         if callee.is_function():
             return self.call(callee.value, arg_count)
+        elif callee.is_native():
+            native = callee.value
+            args_start = len(self.stack) - arg_count
+            result = native.native_fn(arg_count, self.stack[args_start:])
+            self.stack = self.stack[:-arg_count - 1]
+            self.push(result)
+            return True
         else:
             self.runtime_error("Can only call functions and classes.")
             return False
@@ -120,6 +137,11 @@ class VM():
             self.runtime_error("Operands must be numbers.")
             return InterpretResult.RUNTIME_ERROR
 
+    def pp_stack(self):
+        for value in self.stack:
+            print(f"[ {value} ]", end="")
+        print("")
+
     def run(self):
         """
         Returns tuple of (InterpretResult, result)
@@ -127,13 +149,11 @@ class VM():
         frame = self.frames[-1]
 
         # TODO: only if some `debug` arg is passed
-        frame.function.chunk.disassemble()
+        #frame.function.chunk.disassemble()
 
         while True:
             # TODO: only do if some `debug` arg is passed
-            for value in self.stack:
-                print(f"[ {value} ]", end="")
-            print("")
+            #self.pp_stack()
 
             instruction = self.read_op(frame)
             match instruction:

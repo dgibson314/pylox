@@ -5,6 +5,7 @@ from lox_chunk import Chunk
 
 OBJ_STRING = 1
 OBJ_FUNCTION = 2
+OBJ_NATIVE = 3
 
 class Object(ABC):
     instances = []
@@ -51,6 +52,17 @@ class ObjFunction(Object):
         if self.name == "":
             return "<script>"
         return f"<fn {self.name}>"
+
+    def __eq__(self, other):
+        raise NotImplementedError
+
+class ObjNative(Object):
+    def __init__(self, native_fn):
+        self.native_fn = native_fn
+        super().__init__(OBJ_NATIVE)
+
+    def __str__(self):
+        return "<native fn>"
 
     def __eq__(self, other):
         raise NotImplementedError

@@ -118,7 +118,8 @@ class PrattParser():
         while True:
             self.loc.current = self.scanner.scan_token()
             if self.loc.current is not TT.ERROR:
-                print(self.loc.current)
+                # TODO: put behind debug flag
+                #print(self.loc.current)
                 break
             self.error_at_current(self.loc.current.lexeme)
 
