@@ -1,5 +1,4 @@
 from enum import Enum
-from lox_value import Value
 
 OpCode = Enum("OpCode", [
     "CONSTANT",
@@ -25,6 +24,7 @@ OpCode = Enum("OpCode", [
     "JUMP",
     "JUMP_IF_FALSE",
     "LOOP",
+    "CALL",
     "RETURN",
 ])
 
@@ -50,8 +50,7 @@ class Chunk():
     def constant_instruction(self, op, offset):
         constant = self.code[offset + 1]
         value = self.constants[constant]
-        print(f"{op.name} {constant} ", end="")
-        print(value.value)
+        print(f"{op.name}\t{constant}  {value.value}")
         return offset + 2
 
     def byte_instruction(self, op, offset):
@@ -77,7 +76,8 @@ class Chunk():
                 return self.jump_instruction(op, -1, offset)
 
             case OpCode.GET_LOCAL \
-               | OpCode.SET_LOCAL:
+               | OpCode.SET_LOCAL \
+               | OpCode.CALL:
                 return self.byte_instruction(op, offset)
 
             case OpCode.CONSTANT \
@@ -108,7 +108,7 @@ class Chunk():
                 print(f"Unknown opcode {op}")
                 return offset + 1
 
-    def disassemble(self, name="test"):
+    def disassemble(self, name="<script>"):
         print(f"== {name} ==")
 
         offset = 0
@@ -117,7 +117,5 @@ class Chunk():
 
     def debug_constants(self):
         for constant in self.constants:
-            if not isinstance(constant, Value):
-                raise Exception("Not a Value")
             print(constant)
 

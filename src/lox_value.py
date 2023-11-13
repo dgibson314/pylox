@@ -1,4 +1,4 @@
-from lox_object import Object, ObjString
+from lox_object import Object, ObjString, ObjFunction, ObjNative
 
 class Value():
     def __init__(self, value):
@@ -34,12 +34,17 @@ class Value():
     def is_number(self):
         return isinstance(self.value, float)
 
-    def is_string(self):
-        return isinstance(self.value, ObjString)
-
     def is_object(self):
         return isinstance(self.value, Object)
 
+    def is_string(self):
+        return isinstance(self.value, ObjString)
+
+    def is_function(self):
+        return isinstance(self.value, ObjFunction)
+
+    def is_native(self):
+        return isinstance(self.value, ObjNative)
+
     def is_falsey(self):
         return self.value is None or self.value is False
-

@@ -1,7 +1,11 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from lox_chunk import Chunk
+
 OBJ_STRING = 1
+OBJ_FUNCTION = 2
+OBJ_NATIVE = 3
 
 class Object(ABC):
     instances = []
@@ -36,3 +40,29 @@ class ObjString(Object):
         if not isinstance(other, ObjString):
             raise TypeError
         return ObjString(self.chars + other.chars)
+
+class ObjFunction(Object):
+    def __init__(self, arity=0, chunk=None, name=""):
+        self.arity = arity
+        self.chunk = chunk if chunk is not None else Chunk()
+        self.name = name
+        super().__init__(OBJ_FUNCTION)
+
+    def __str__(self):
+        if self.name == "":
+            return "<script>"
+        return f"<fn {self.name}>"
+
+    def __eq__(self, other):
+        raise NotImplementedError
+
+class ObjNative(Object):
+    def __init__(self, native_fn):
+        self.native_fn = native_fn
+        super().__init__(OBJ_NATIVE)
+
+    def __str__(self):
+        return "<native fn>"
+
+    def __eq__(self, other):
+        raise NotImplementedError

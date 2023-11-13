@@ -1,11 +1,11 @@
 from collections import namedtuple
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 import pdb
 
 from lox_chunk import Chunk
 from lox_chunk import OpCode as OP
-from lox_object import Object, ObjString
+from lox_object import Object, ObjString, ObjFunction
 from lox_value import Value
 from tokens import TokenType as TT
 from tokens import Token
@@ -25,9 +25,13 @@ PREC_PRIMARY = 10
 ParseRule = namedtuple("ParseRule", ["prefix", "infix", "precedence"])
 
 @dataclass
+class ParserLocation:
+    current: Token = None
+    previous: Token = None
+
+@dataclass
 class Scope:
     _locals: list
-    count: int = 0
     scope_depth: int = 0
 
 @dataclass
@@ -36,26 +40,31 @@ class Local:
     depth: int
     initialized: bool
 
-#Scope = namedtuple("Scope", ["locals", "count", "scope_depth"])
-
-# Depth field records the scope depth of the block where the local var was declared
-#Local = namedtuple("Local", ["name", "depth", "initialized"])
+class FunctionType(IntEnum):
+    FUNCTION = 0
+    SCRIPT = 1
 
 class PrattParser():
    
-    def __init__(self, scanner):
+    def __init__(self, function_type, scanner, location=ParserLocation()):
+        self.function_type = function_type
         self.scanner = scanner
+        self.loc = location
 
-        self.current = None
         self.had_error = False
         self.panic_mode = False
 
-        self.scope = Scope([], 0, 0)
+        self.scope = Scope([], 0)
 
-        self.chunk = Chunk()
+        # Compiler implicitly claims stack slot zero for internal use
+        self.add_local(Token(None, "", None, None))
+
+        self._function = ObjFunction()
+        if self.function_type != FunctionType.SCRIPT:
+            self._function.name = self.loc.previous.lexeme
 
         self.parse_rules = {
-            TT.LEFT_PAREN:      ParseRule(self.grouping, None, PREC_NONE),
+            TT.LEFT_PAREN:      ParseRule(self.grouping, self.call, PREC_CALL),
             TT.RIGHT_PAREN:     ParseRule(None, None, PREC_NONE),
             TT.LEFT_BRACE:      ParseRule(None, None, PREC_NONE),
             TT.RIGHT_BRACE:     ParseRule(None, None, PREC_NONE),
@@ -97,38 +106,43 @@ class PrattParser():
         while not self.match(TT.EOF):
             self.declaration()
 
-        self.end_compiler()
-        return self.chunk
+        return self.end_compiler()
+
+    @property
+    def chunk(self):
+        return self._function.chunk
 
     def advance(self):
-        self.previous = self.current
+        self.loc.previous = self.loc.current
 
         while True:
-            self.current = self.scanner.scan_token()
-            if self.current is not TT.ERROR:
+            self.loc.current = self.scanner.scan_token()
+            if self.loc.current is not TT.ERROR:
+                # TODO: put behind debug flag
+                #print(self.loc.current)
                 break
-            self.error_at_current(self.current.lexeme)
+            self.error_at_current(self.loc.current.lexeme)
 
     def match(self, token_type):
-        if self.current._type != token_type:
+        if self.loc.current._type != token_type:
             return False
-        if self.current._type == TT.EOF:
+        if self.loc.current._type == TT.EOF:
             return True
         self.advance()
         return True
 
     def consume(self, token_type, message):
-        if self.current._type == token_type:
+        if self.loc.current._type == token_type:
             self.advance()
             return
 
         self.error_at_current(message)
 
     def error_at_current(self, message):
-        self.error_at(self.current, message)
+        self.error_at(self.loc.current, message)
 
     def error(self, message):
-        self.error_at(self.previous, message)
+        self.error_at(self.loc.previous, message)
 
     def error_at(self, token, message):
         if self.panic_mode:
@@ -147,9 +161,11 @@ class PrattParser():
         self.had_error = True
 
     def emit_byte(self, op):
-        self.chunk.write(op, self.previous.line)
+        self.chunk.write(op, self.loc.previous.line)
 
     def emit_bytes(self, op1, op2):
+        assert op1 is not None
+        assert op2 is not None
         self.emit_byte(op1)
         self.emit_byte(op2)
 
@@ -172,6 +188,7 @@ class PrattParser():
         return len(self.chunk.code) - 1
 
     def emit_return(self):
+        self.emit_byte(OP.NIL)
         self.emit_byte(OP.RETURN)
 
     def emit_constant(self, value):
@@ -185,6 +202,7 @@ class PrattParser():
 
     def end_compiler(self):
         self.emit_return()
+        return self._function
 
     def begin_scope(self):
         self.scope.scope_depth += 1
@@ -197,7 +215,7 @@ class PrattParser():
             self.scope._locals.pop()
 
     def binary(self):
-        tt_type = self.previous._type
+        tt_type = self.loc.previous._type
 
         # Compile the right operand
         precedence = self.parse_rules[tt_type].precedence
@@ -218,8 +236,24 @@ class PrattParser():
             case _:
                 raise Exception("Unreachable binary operator type")
 
+    def call(self):
+        arg_count = self.argument_list()
+        self.emit_bytes(OP.CALL, arg_count)
+
+    def argument_list(self):
+        arg_count = 0
+        if self.loc.current._type != TT.RIGHT_PAREN:
+            while True:
+                self.expression()
+                arg_count +=1
+                if not self.match(TT.COMMA):
+                    break
+
+        self.consume(TT.RIGHT_PAREN, "Expect ')' after arguments.")
+        return arg_count
+
     def literal(self):
-        match self.previous._type:
+        match self.loc.previous._type:
             case TT.FALSE: self.emit_byte(OP.FALSE)
             case TT.NIL:   self.emit_byte(OP.NIL)
             case TT.TRUE:  self.emit_byte(OP.TRUE)
@@ -234,9 +268,46 @@ class PrattParser():
         self.parse_precedence(PREC_ASSIGNMENT)
 
     def block(self):
-        while self.current._type != TT.RIGHT_BRACE and self.current._type != TT.EOF:
+        while self.loc.current._type != TT.RIGHT_BRACE and self.loc.current._type != TT.EOF:
             self.declaration()
         self.consume(TT.RIGHT_BRACE, "Expect '}' after block.")
+
+    def fun_declaration(self):
+        global_idx = self.parse_variable("Expect function name.")
+
+        # Mark the function declaration's variable "initialized" as soon as we compile
+        # the name so that it can be referenced in the function's body without generating
+        # an error.
+        if self.scope.scope_depth > 0:
+            self.scope._locals[-1].initialized = True
+
+        self.function(FunctionType.FUNCTION)
+
+        self.define_variable(global_idx)
+
+    def function(self, function_type):
+        ic = PrattParser(function_type, self.scanner)
+        ic.begin_scope()
+
+        ic.loc = self.loc
+
+        ic.consume(TT.LEFT_PAREN, "Expect '(' after function name.")
+        if ic.loc.current._type != TT.RIGHT_PAREN:
+            while True:
+                ic._function.arity += 1
+                constant_idx = ic.parse_variable("Expect parameter name.")
+                ic.define_variable(constant_idx)
+                if not ic.match(TT.COMMA):
+                    break
+
+        ic.consume(TT.RIGHT_PAREN, "Expect ')' after parameters.")
+        ic.consume(TT.LEFT_BRACE, "Expect '{' before function body.")
+
+        ic.block()
+
+        nested_function = ic.end_compiler()
+        constant_index = self.chunk.add_constant(Value(nested_function))
+        self.emit_bytes(OP.CONSTANT, constant_index)
 
     def define_variable(self, global_idx):
         if self.scope.scope_depth > 0:
@@ -348,6 +419,17 @@ class PrattParser():
         self.consume(TT.SEMICOLON, "Expect ';' after value.")
         self.emit_byte(OP.PRINT)
 
+    def return_statement(self):
+        if self.function_type == FunctionType.SCRIPT:
+            self.error("Can't return from top-level code.")
+
+        if self.match(TT.SEMICOLON):
+            self.emit_return()
+        else:
+            self.expression()
+            self.consume(TT.SEMICOLON, "Expect ';' after return value.")
+            self.emit_byte(OP.RETURN)
+
     def while_statement(self):
         # Keep track of the start of statement; we'll jump back here after evaluating
         # the body of the loop
@@ -370,10 +452,10 @@ class PrattParser():
         self.panic_mode = False
 
         # Skip tokens until we reach something that looks like a statement boundary
-        while self.current._type != TT.EOF:
-            if self.previous._type == TT.SEMICOLON:
+        while self.loc.current._type != TT.EOF:
+            if self.loc.previous._type == TT.SEMICOLON:
                 return
-            match self.current._type:
+            match self.loc.current._type:
                 case TT.CLASS \
                    | TT.FUN \
                    | TT.VAR \
@@ -387,7 +469,9 @@ class PrattParser():
             self.advance()
 
     def declaration(self):
-        if self.match(TT.VAR):
+        if self.match(TT.FUN):
+            self.fun_declaration()
+        elif self.match(TT.VAR):
             self.var_declaration()
         else:
             self.statement()
@@ -400,6 +484,8 @@ class PrattParser():
             self.print_statement()
         elif self.match(TT.IF):
             self.if_statement()
+        elif self.match(TT.RETURN):
+            self.return_statement()
         elif self.match(TT.FOR):
             self.for_statement()
         elif self.match(TT.WHILE):
@@ -413,16 +499,16 @@ class PrattParser():
 
     def number(self):
         # Number tokens store the number as a `float` in the `literal` field
-        value = Value(self.previous.literal)
+        value = Value(self.loc.previous.literal)
         self.emit_constant(value)
 
     def string(self):
-        interned = ObjString(self.previous.literal)
+        interned = ObjString(self.loc.previous.literal)
         self.emit_constant(Value(interned))
-        #self.emit_constant(Value(self.previous.literal))
+        #self.emit_constant(Value(self.loc.previous.literal))
 
     def variable(self, can_assign):
-        self.named_variable(self.previous, can_assign)
+        self.named_variable(self.loc.previous, can_assign)
 
     def named_variable(self, name, can_assign):
         get_op = OP.GET_GLOBAL
@@ -451,7 +537,7 @@ class PrattParser():
         return -1
 
     def unary(self):
-        tt_type = self.previous._type
+        tt_type = self.loc.previous._type
 
         # Compile the operand
         self.parse_precedence(PREC_UNARY)
@@ -466,7 +552,7 @@ class PrattParser():
 
     def parse_precedence(self, precedence):
         self.advance()
-        prefix_rule = self.parse_rules[self.previous._type].prefix
+        prefix_rule = self.parse_rules[self.loc.previous._type].prefix
         if prefix_rule == None:
             self.error("Expect expression.")
             return
@@ -478,9 +564,9 @@ class PrattParser():
         else:
             prefix_rule()
 
-        while (precedence <= self.parse_rules[self.current._type].precedence):
+        while (precedence <= self.parse_rules[self.loc.current._type].precedence):
             self.advance()
-            infix_rule = self.parse_rules[self.previous._type].infix
+            infix_rule = self.parse_rules[self.loc.previous._type].infix
             infix_rule()
 
         if can_assign and self.match(TT.EQUAL):
@@ -501,7 +587,7 @@ class PrattParser():
         if self.scope.scope_depth == 0:
             return
 
-        var_name = self.previous
+        var_name = self.loc.previous
 
         # It's an error to have two variables with the same name in the same local scope
         for local in self.scope._locals[::-1]:
@@ -510,7 +596,7 @@ class PrattParser():
             if var_name == local.name:
                 self.error("Already variable with this name in this scope.")
 
-        self.add_local(self.previous)
+        self.add_local(self.loc.previous)
 
     def parse_variable(self, message):
         self.consume(TT.IDENTIFIER, message)
@@ -519,4 +605,4 @@ class PrattParser():
         if self.scope.scope_depth > 0:
             return 0
 
-        return self.identifier_constant(self.previous)
+        return self.identifier_constant(self.loc.previous)

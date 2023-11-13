@@ -1,10 +1,11 @@
 from enum import Enum
 import operator
 import pdb
+import time
 
-from compiler import PrattParser
+from compiler import PrattParser, FunctionType
 from lox_chunk import OpCode as OP
-from lox_object import Object
+from lox_object import Object, ObjNative
 from lox_value import Value
 from scanner import Scanner
 
@@ -21,37 +22,63 @@ BIN_OPS = {
     ">": operator.gt
 }
 
+def clock_native(arg_count, args):
+    return Value(time.time())
+
+
+class CallFrame:
+    def __init__(self, function, ip, slots):
+        self.function = function
+        self.ip = ip
+        self.slots = slots
+
+
 class VM():
     def __init__(self):
-        self.ip = 0
+        self.frames = []
         self.stack = []
         self.globals = {}
 
+        self.define_native("clock", clock_native)
+
     def interpret(self, source):
         self.ip = 0
+        
         scanner = Scanner(source)
-        compiler = PrattParser(scanner)
-        self.chunk = compiler.compile()
+        compiler = PrattParser(FunctionType.SCRIPT, scanner)
+        function = compiler.compile()
 
         if compiler.had_error:
             return InterpretResult.COMPILE_ERROR
 
+        self.push(Value(function))
+        self.call_value(Value(function), 0)
+
         return self.run()
 
-    def read_op(self):
-        op = self.chunk.code[self.ip]
-        self.ip += 1
+    def read_op(self, frame):
+        op = frame.function.chunk.code[frame.ip]
+        frame.ip += 1
         return op
 
     def runtime_error(self, message):
         print(message)
 
-        line = self.chunk.lines[self.ip - 1]
-        print(f"[line {line}] in script")
+        for index, frame in reversed(list(enumerate(self.frames))):
+            function = frame.function
+            instruction = function.chunk.code[frame.ip - 1]
+            line = function.chunk.lines[frame.ip - 1]
+            func_name = "script" if function.name == "" else function.name + "()"
+            print(f"[line {line}] in {func_name}")
 
-    def read_constant(self):
-        index = self.read_op()
-        return self.chunk.constants[index]
+        # TODO: need to reset stack here?
+
+    def define_native(self, name, function):
+        self.globals[Value(name)] = Value(ObjNative(function))
+
+    def read_constant(self, frame):
+        index = self.read_op(frame)
+        return frame.function.chunk.constants[index]
 
     def push(self, value):
         self.stack.append(value)
@@ -62,6 +89,36 @@ class VM():
     def peek(self, distance):
         index = -1 - distance
         return self.stack[index]
+
+    def call(self, function, arg_count):
+        if arg_count != function.arity:
+            self.runtime_error(
+                f"Expected {function.arity} arguments but got {arg_count}."
+            )
+            return False
+
+        # -1 to account for slot zero, which contains function being called
+        slots_start = len(self.stack) - arg_count - 1
+
+        # TODO: should we initialize frame.slots to be the whole stack starting
+        # at `slots_start`, or just from `slots_start` to `slots_start` + args + 1?
+        frame = CallFrame(function, 0, self.stack[slots_start:])
+        self.frames.append(frame)
+        return True
+
+    def call_value(self, callee, arg_count):
+        if callee.is_function():
+            return self.call(callee.value, arg_count)
+        elif callee.is_native():
+            native = callee.value
+            args_start = len(self.stack) - arg_count
+            result = native.native_fn(arg_count, self.stack[args_start:])
+            self.stack = self.stack[:-arg_count - 1]
+            self.push(result)
+            return True
+        else:
+            self.runtime_error("Can only call functions and classes.")
+            return False
 
     def concatenate(self):
         b = self.pop().value
@@ -80,16 +137,28 @@ class VM():
             self.runtime_error("Operands must be numbers.")
             return InterpretResult.RUNTIME_ERROR
 
+    def pp_stack(self):
+        for value in self.stack:
+            print(f"[ {value} ]", end="")
+        print("")
+
     def run(self):
         """
         Returns tuple of (InterpretResult, result)
         """
-        self.chunk.disassemble()
+        frame = self.frames[-1]
+
+        # TODO: only if some `debug` arg is passed
+        #frame.function.chunk.disassemble()
+
         while True:
-            instruction = self.read_op()
+            # TODO: only do if some `debug` arg is passed
+            #self.pp_stack()
+
+            instruction = self.read_op(frame)
             match instruction:
                 case OP.CONSTANT:
-                    constant = self.read_constant()
+                    constant = self.read_constant(frame)
                     self.push(constant)
 
                 case OP.NIL:
@@ -105,15 +174,15 @@ class VM():
                     self.pop()
 
                 case OP.GET_LOCAL:
-                    slot = self.read_op()
-                    self.push(self.stack[slot])
+                    slot = self.read_op(frame)
+                    self.push(frame.slots[slot])
 
                 case OP.SET_LOCAL:
-                    slot = self.read_op()
-                    self.stack[slot] = self.peek(0)
+                    slot = self.read_op(frame)
+                    frame.slots[slot] = self.peek(0)
 
                 case OP.GET_GLOBAL:
-                    name = self.read_constant()
+                    name = self.read_constant(frame)
                     value = self.globals.get(name, None)
                     if value is None:
                         self.runtime_error(f"Undefined variable '{name.value}'")
@@ -121,14 +190,14 @@ class VM():
                     self.push(value)
 
                 case OP.SET_GLOBAL:
-                    name = self.read_constant()
+                    name = self.read_constant(frame)
                     if name not in self.globals.keys():
                         self.runtime_error(f"Undefined variable '{name.value}'")
                         return InterpretResult.RUNTIME_ERROR
                     self.globals[name] = self.peek(0)
 
                 case OP.DEFINE_GLOBAL:
-                    name = self.read_constant()
+                    name = self.read_constant(frame)
                     self.globals[name] = self.peek(0)
                     self.pop()
 
@@ -172,22 +241,33 @@ class VM():
                     print(self.pop())
 
                 case OP.JUMP:
-                    offset = self.read_op()
-                    self.ip += offset
+                    offset = self.read_op(frame)
+                    frame.ip += offset
 
                 case OP.JUMP_IF_FALSE:
-                    offset = self.read_op()
+                    offset = self.read_op(frame)
                     if self.peek(0).is_falsey():
-                        self.ip += offset
+                        frame.ip += offset
 
                 case OP.LOOP:
-                    offset = self.read_op()
-                    self.ip -= offset
+                    offset = self.read_op(frame)
+                    frame.ip -= offset
+
+                case OP.CALL:
+                    arg_count = self.read_op(frame)
+                    if not self.call_value(self.peek(arg_count), arg_count):
+                        return InterpretResult.RUNTIME_ERROR
+                    frame = self.frames[-1]
 
                 case OP.RETURN:
-                    # TODO: now that we've implemented print statements, should we just
-                    # be returning the InterpretStatus?
-                    return InterpretResult.OK
+                    result = self.pop()
+                    self.frames.pop()
+                    if len(self.frames) == 0:
+                        self.pop()
+                        return InterpretResult.OK
+                    self.stack = self.stack[:-(len(frame.slots))]
+                    self.push(result)
+                    frame = self.frames[-1]
 
                 case _:
                     print("Unknown opcode {instruction}")
